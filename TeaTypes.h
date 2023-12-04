@@ -2,13 +2,18 @@
 #ifndef TEA_TYPES_H
 #define TEA_TYPES_H
 
-struct TeaType {
-	const char* name;
-	int temperature;
+struct teaType {
+    const char* teaName;
+    int teaTime;
+    int teaTemp;
 };
 
-extern const TeaType greenTea;
-extern const TeaType blackTea;
-extern const TeaType herbalTea;
+const teaType[] = {
+    {"White Tea", 270000, 79},
+    {"Green Tea", 240000, 79},
+    {"Black Tea", 210000, 91},
+    {"Oolong Tea", 210000, 91},
+    {"Herbal Tea", 800000, 99},
+};
 
-#endif
+#endif // TEA_TYPES_H
