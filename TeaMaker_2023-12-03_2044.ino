@@ -1,79 +1,119 @@
 #include <Servo.h>
 #include <Stepper.h>
+#include "TeaTypes.h"
 
-// Define Analog Sensor Pins
+// Define pin numbers
+const int pivotServoPin = 2;
+const int grabberServoPin = 3;
+const int loadButtonPin = 4;
+const int nextButtonPin = 5;
+const int rotaryInputPin = 6;
+const int elevatorRackStepPin = 7;
+const int elevatorRackDirPin = 8;
+const int heatingCoil = ?;
+const int cupPresencePin = 9;
+const int relayPin = 10;
+const int temperatureSensorPin = A0;
+const int ultrasonicTrigPin = 11;
+const int ultrasonicEchoPin = 12;
+const int waterReservoir = ?;
+const int waterPump = ?;
+const int airPump = ?;
 
-const int rotaryInput = 4;
-const int cupPresence = 5;
-const int waterReservoir = 6;
-const int heatingCoil = 7;
-const int temperatureSensor = 8;
 
-// Define Digital Input Pins
+// Define constants
+const int STEPS_PER_REVOLUTION = 200;
+const int dispenseTime = 5000;  // Adjust as needed
 
+// Create Servo and Stepper objects
+Servo pivotServo;
+Servo grabberServo;
+Stepper elevatorRack(STEPS_PER_REVOLUTION, elevatorRackStepPin, elevatorRackDirPin);
 
-// Define user interraction pins
-const int loadButton = 2;
-const int nextButton = 3;
+// Other variables
+TeaType currentTea = {"White Tea", 270000, 79};  // Default tea type
+int teaTimeAdjustment = 0;
 
-
-// Define Analog Input Pins
-const int waterReservoir = 6; // Water presence sensor
-
-// Define Motor Pins
-const int pivotServo = 9;
-const int elevatorRack = 10;
-const int grabberServo = 11;
-
-// Define tea types
-const struct TeaType {
+/**
+// Define Tea Types - External Include?
+const struct teaTypes {
   const char* name;
   unsigned long time;
   int temp;
-} teaTypes[] = {
+  
+} teaType[] = {
   {"White Tea", 270000, 79},
   {"Green Tea", 240000, 79},
   {"Black Tea", 210000, 91},
   {"Oolong Tea", 210000, 91},
   {"Herbal Tea", 800000, 99},
 };
+**/
+
+
+// Define constants
+const int STEPS_PER_REVOLUTION = 200;
+const int dispenseTime = 5000;  // Adjust as needed
+
+// Create Servo and Stepper objects
+Servo pivotServo;
+Servo grabberServo;
+Stepper elevatorRack(STEPS_PER_REVOLUTION, elevatorRackStepPin, elevatorRackDirPin);
+
 
 // Define variables
 int currentTeaIndex = 0;
 unsigned long currentTeaTime = teaTypes[currentTeaIndex].time;
 int currentTeaTemp = teaTypes[currentTeaIndex].temp;
+TeaType currentTea = {"White Tea", 270000, 79};  // Default tea type
+int teaTimeAdjustment = 0;
 
-// Define functions
+//Setup - Runs once
+
+void setup() {
+  // Initialization code here
+}
+
+//Main program
+
+void loop() {
+  startupInit();
+  loadGrabber();
+  teaSelection();
+  progAdjust();
+  preFlight();
+  heatWater();
+  steepFunction();
+  disposeBag();
+  shutDown();
+}
+
+// Functions called by main program
+
 void startupInit() {
-  // Rotate arm to 90 degrees
-  rotateArm(90);
-  
-  // Move gantry until limit switch is triggered, then stop
-  while (digitalRead(elevatorRack) == LOW) {
-    moveGantry(1);
+  // Code for startup initialization
+  pivotServo.write(90);
+  // Move gantry until limit switch is triggered
+  while (digitalRead(elevatorRackLimitSwitchPin) == HIGH) {
+    elevatorRack.step(1);
   }
-  moveGantry(0);
-  
-  // Rotate arm to 0 degrees
-  rotateArm(0);
+  elevatorRack.step(-10);  // Adjust as needed
+  pivotServo.write(0);
 }
 
 void loadGrabber() {
-  // Close grabber servo
-  closeGrabber();
-  
-  // Listen for button press
-  while (digitalRead(loadButton) == LOW) {
-    // Open grabberServo while button is pressed
-    openGrabber();
+  // Code for loading the grabber
+  grabberServo.write(90);  // Close grabber
+  while (digitalRead(loadButtonPin) == LOW) {
+    // Wait for load button press
   }
-  
-  // When the button is released, the grabberServo returns to closed
-  closeGrabber();
-  
-  // Wait for next button to be pressed
-  while (digitalRead(nextButton) == HIGH) {
-    delay(100);
+  grabberServo.write(0);  // Open grabber
+  while (digitalRead(loadButtonPin) == HIGH) {
+    // Wait for load button release
+  }
+  // Wait for next button press
+  while (digitalRead(nextButtonPin) == LOW) {
+    // Wait for next button press
   }
 }
 
@@ -138,5 +178,22 @@ void heatWater() {
   // Water is pumped from the reservoir to the boiler
   // Heating coil is energized by activating a pin connected to a relay
   digitalWrite(heatingCoil, HIGH);
-  
-  // Temperature sensor measures the water temperature during heating until it reaches the
+  // measure temperature, dispense water
+}
+
+void steepFunction() {
+  // Code for steeping the tea bag
+  // Lower tea bag, countdown, raise tea bag
+  // Move on to next function automatically
+}
+
+void disposeBag() {
+  // Code for disposing of the tea bag
+  // Listen to ultrasonic sensor, move gantry, rotate arm, release grabber, move gantry
+  // Wait for next button press
+}
+
+void shutDown() {
+  // Code for shutting down the unit
+  // Activate latching circuit
+}
