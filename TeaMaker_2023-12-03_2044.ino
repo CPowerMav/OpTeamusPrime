@@ -1,16 +1,29 @@
 #include <Servo.h>
+#include <Stepper.h>
 
-// Define pins
-const int pivotServo = 9;
-const int elevatorRack = 10;
-const int grabberServo = 11;
-const int loadButton = 2;
-const int nextButton = 3;
+// Define Analog Sensor Pins
+
 const int rotaryInput = 4;
 const int cupPresence = 5;
 const int waterReservoir = 6;
 const int heatingCoil = 7;
 const int temperatureSensor = 8;
+
+// Define Digital Input Pins
+
+
+// Define user interraction pins
+const int loadButton = 2;
+const int nextButton = 3;
+
+
+// Define Analog Input Pins
+const int waterReservoir = 6; // Water presence sensor
+
+// Define Motor Pins
+const int pivotServo = 9;
+const int elevatorRack = 10;
+const int grabberServo = 11;
 
 // Define tea types
 const struct TeaType {
