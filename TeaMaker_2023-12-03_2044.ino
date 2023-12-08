@@ -1,3 +1,4 @@
+// External includes
 #include <Servo.h>
 #include <Stepper.h>
 #include "TeaTypes.h"
@@ -25,40 +26,32 @@ const int airPump = ?;
 const int STEPS_PER_REVOLUTION = 200;
 const int dispenseTime = 5000;  // Adjust as needed
 
+// Temperature math values
+const float Rref = 10000.0;  // Reference resistance
+const float nominal_temeprature = 25.0;  // Nominal temperature in Celsius
+const float nominal_resistance = 10000.0;  // Nominal resistance at nominal temperature
+const float beta = 3950.0;  // Beta value of the NTC thermistor
+
 // Create Servo and Stepper objects
 Servo pivotServo;
 Servo grabberServo;
 Stepper elevatorRack(STEPS_PER_REVOLUTION, elevatorRackStepPin, elevatorRackDirPin);
 
-// Other variables
-TeaType currentTea = {"White Tea", 270000, 79};  // Default tea type
-int teaTimeAdjustment = 0;
 
-/**
 // Define Tea Types - External Include?
 const struct teaTypes {
   const char* name;
   unsigned long time;
   int temp;
-  
-} teaType[] = {
+}
+
+teaType[] = {
   {"White Tea", 270000, 79},
   {"Green Tea", 240000, 79},
   {"Black Tea", 210000, 91},
   {"Oolong Tea", 210000, 91},
   {"Herbal Tea", 800000, 99},
 };
-**/
-
-
-// Define constants
-const int STEPS_PER_REVOLUTION = 200;
-const int dispenseTime = 5000;  // Adjust as needed
-
-// Create Servo and Stepper objects
-Servo pivotServo;
-Servo grabberServo;
-Stepper elevatorRack(STEPS_PER_REVOLUTION, elevatorRackStepPin, elevatorRackDirPin);
 
 
 // Define variables
@@ -71,7 +64,8 @@ int teaTimeAdjustment = 0;
 //Setup - Runs once
 
 void setup() {
-  // Initialization code here
+	Serial.begin(9600);
+	Serial.print("The program has begun");
 }
 
 //Main program
@@ -90,9 +84,10 @@ void loop() {
 
 // Functions called by main program
 
-void startupInit() {
-  // Code for startup initialization
-  pivotServo.write(90);
+void startupInit() { // Code for startup initialization
+  pivotServo.write(90); // Rotate grabber to EAST
+  delay(1000); // Wait a second for it to arrive
+  
   // Move gantry until limit switch is triggered
   while (digitalRead(elevatorRackLimitSwitchPin) == HIGH) {
     elevatorRack.step(1);
@@ -176,8 +171,16 @@ void preFlight() {
 
 void heatWater() {
   // Water is pumped from the reservoir to the boiler
-  // Heating coil is energized by activating a pin connected to a relay
-  digitalWrite(heatingCoil, HIGH);
+  
+  digitalWrite(heatingCoil, HIGH);   // Heating coil is energized by activating a pin connected to a relay
+
+
+  int temperatureReading = analogRead(temperatureSensorPin);
+  float temperatureCelsius = calculateTemperature(temperatureReading);
+
+  Serial.print("Temperature: ");
+  Serial.println(temperatureCelsius);
+  
   // measure temperature, dispense water
 }
 
@@ -196,4 +199,11 @@ void disposeBag() {
 void shutDown() {
   // Code for shutting down the unit
   // Activate latching circuit
+}
+
+float calculateTemperature(int temperatureSensorPin) {
+  float R = Rref * (1023.0 / (float)temperatureSensorPin - 1.0); // Calculate NTC resistance
+  float T = 1.0 / (1.0 / (nominal_temeprature + 273.15) + log(R / nominal_resistance) / beta);
+  T -= 273.15; // convert absolute temp to C
+  return T;
 }
