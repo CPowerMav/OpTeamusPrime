@@ -3,33 +3,36 @@
 #include <Stepper.h>
 #include "TeaTypes.h"
 
-// Define pin numbers
-const int pivotServoPin = 2;
-const int grabberServoPin = 3;
-const int loadButtonPin = 4;
-const int nextButtonPin = 5;
-const int rotaryInputPin = 6;
-const int elevatorRackStepPin = 7;
-const int elevatorRackDirPin = 8;
-const int heatingCoil = ?;
-const int cupPresencePin = 9;
-const int relayPin = 10;
-const int temperatureSensorPin = A0;
-const int ultrasonicTrigPin = 11;
-const int ultrasonicEchoPin = 12;
-const int waterReservoir = ?;
-const int waterPump = ?;
-const int airPump = ?;
+// Define Digital IO pin numbers
+const int pivotServoPin = 22;
+const int grabberServoPin = 23;
+const int loadButtonPin = 24;
+const int nextButtonPin = 25;
+const int rotaryInputPin = 26;
+const int elevatorRackStepPin = 27;
+const int elevatorRackDirPin = 28;
+const int elevatorRackLimitSwitchPin = 29;
+const int heatingCoil = 30;
 
+const int cupPresencePin = 31;
+const int ultrasonicTrigPin = 32;
+const int ultrasonicEchoPin = 33;
+
+const int waterPump = 34;
+const int airPump = 35;
+
+// Define Analog IO Pins
+const int temperatureSensorPin = A0; 
+const int waterReservoir = A1;
+const int waterFill = A2;  // Water level probe inside boiler for regular size
+const int waterFillMax = A3; // Water level probe inside boiler for max size
 
 // Define constants
-const int STEPS_PER_REVOLUTION = 200;
+const int STEPS_PER_REVOLUTION = 200; // Stepper value
 const int dispenseTime = 5000;  // Adjust as needed
-
-// Temperature math values
-const float Rref = 10000.0;  // Reference resistance
+const float Rref = 50000.0;  // Reference resistance
 const float nominal_temeprature = 25.0;  // Nominal temperature in Celsius
-const float nominal_resistance = 10000.0;  // Nominal resistance at nominal temperature
+const float nominal_resistance = 50000.0;  // Nominal resistance at nominal temperature
 const float beta = 3950.0;  // Beta value of the NTC thermistor
 
 // Create Servo and Stepper objects
@@ -57,7 +60,7 @@ teaType[] = {
 // Define variables
 int currentTeaIndex = 0;
 unsigned long currentTeaTime = teaTypes[currentTeaIndex].time;
-int currentTeaTemp = teaTypes[currentTeaIndex].temp;
+int selectedTeaTemp = teaTypes[currentTeaIndex].temp;
 TeaType currentTea = {"White Tea", 270000, 79};  // Default tea type
 int teaTimeAdjustment = 0;
 
@@ -93,7 +96,7 @@ void startupInit() { // Code for startup initialization
     elevatorRack.step(1);
   }
   elevatorRack.step(-10);  // Adjust as needed
-  pivotServo.write(0);
+  pivotServo.write(0); // Rotate grabber to SOUTH
 }
 
 void loadGrabber() {
@@ -127,7 +130,7 @@ void teaSelection() {
     if (encoderValue != encoderLastValue) {
       currentTeaIndex = encoderValue;
       currentTeaTime = teaTypes[currentTeaIndex].time;
-      currentTeaTemp = teaTypes[currentTeaIndex].temp;
+      selectedTeaTemp = teaTypes[currentTeaIndex].temp;
       encoderLastValue = encoderValue;
     }
     delay(50);
@@ -174,15 +177,31 @@ void heatWater() {
   
   digitalWrite(heatingCoil, HIGH);   // Heating coil is energized by activating a pin connected to a relay
 
+  // Wait for the heating coil to warm up (adjust as needed)
+  delay(2000);
 
-  int temperatureReading = analogRead(temperatureSensorPin);
-  float temperatureCelsius = calculateTemperature(temperatureReading);
+  while (true) {
+    int temperatureReading = analogRead(temperatureSensorPin);
+    float temperatureCelsius = calculateTemperature(temperatureReading);
 
-  Serial.print("Temperature: ");
-  Serial.println(temperatureCelsius);
-  
-  // measure temperature, dispense water
+    Serial.print("Temperature: ");
+    Serial.println(temperatureCelsius);
+
+    // Check if the current temperature is below the target temperature
+    if (temperatureCelsius < currentTeaTemp) {
+      // Continue heating
+      // You may need to adjust the heating process based on your system characteristics
+    } else {
+      // Stop heating
+      digitalWrite(heatingCoil, LOW);
+      break;
+    }
+  }
+
+  // Add additional code here for dispensing water into the cup based on dispenseTime
+  // This can include controlling pumps or valves
 }
+
 
 void steepFunction() {
   // Code for steeping the tea bag
