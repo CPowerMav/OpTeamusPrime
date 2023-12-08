@@ -1,7 +1,7 @@
 // External includes
 #include <Servo.h>
 #include <Stepper.h>
-#include "TeaTypes.h"
+// #include "TeaTypes.h"  // Can use external loading of this DB later
 
 // Define Digital IO pin numbers
 const int pivotServoPin = 22;
@@ -42,13 +42,13 @@ Stepper elevatorRack(STEPS_PER_REVOLUTION, elevatorRackStepPin, elevatorRackDirP
 
 
 // Define Tea Types - External Include?
-const struct teaTypes {
+const struct TeaType {
   const char* name;
   unsigned long time;
   int temp;
-}
+};
 
-teaType[] = {
+TeaType teaTypes[] = {
   {"White Tea", 270000, 79},
   {"Green Tea", 240000, 79},
   {"Black Tea", 210000, 91},
@@ -57,9 +57,10 @@ teaType[] = {
 };
 
 
+
 // Define variables
 int currentTeaIndex = 0;
-unsigned long currentTeaTime = teaTypes[currentTeaIndex].time;
+unsigned long selectedTeaTime = teaTypes[currentTeaIndex].time;
 int selectedTeaTemp = teaTypes[currentTeaIndex].temp;
 TeaType currentTea = {"White Tea", 270000, 79};  // Default tea type
 int teaTimeAdjustment = 0;
@@ -129,7 +130,7 @@ void teaSelection() {
     }
     if (encoderValue != encoderLastValue) {
       currentTeaIndex = encoderValue;
-      currentTeaTime = teaTypes[currentTeaIndex].time;
+      selectedTeaTime = teaTypes[currentTeaIndex].time;
       selectedTeaTemp = teaTypes[currentTeaIndex].temp;
       encoderLastValue = encoderValue;
     }
@@ -144,7 +145,7 @@ void progAdjust() {
   while (digitalRead(nextButton) == HIGH) {
     encoderValue += (digitalRead(rotaryInput) == HIGH) - (digitalRead(rotaryInput) == LOW);
     if (encoderValue != encoderLastValue) {
-      currentTeaTime += encoderValue * 30000;
+      selectedTeaTime += encoderValue * 30000;
       encoderLastValue = encoderValue;
     }
     delay(50);
