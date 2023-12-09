@@ -203,7 +203,7 @@ void heatWater() {
     Serial.println(temperatureCelsius);
 
     // Check if the current temperature is below the target temperature
-    if (temperatureCelsius < currentTeaTemp) {
+    if (temperatureCelsius < selectedTeaTemp) {
       // Continue heating
       // You may need to adjust the heating process based on your system characteristics
     } else {
