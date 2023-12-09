@@ -3,21 +3,25 @@
 #include <Stepper.h>
 // #include "TeaTypes.h"  // Can use external loading of this DB later
 
-// Define Digital IO pin numbers
-const int pivotServoPin = 22;
-const int grabberServoPin = 23;
-const int loadButtonPin = 24;
-const int nextButtonPin = 25;
-const int rotaryInputPin = 26;
+// Define Digital IO pin numbers - Skip Pin 13 if possible
+
+	// User Input
+const int loadButton = 22;
+const int nextButton = 23;
+const int rotaryInputPin = 24;
+
+	// Movement
+const int pivotServoPin = 25;
+const int grabberServoPin = 26;
 const int elevatorRackStepPin = 27;
 const int elevatorRackDirPin = 28;
 const int elevatorRackLimitSwitchPin = 29;
-const int heatingCoil = 30;
-
-const int cupPresencePin = 31;
-const int ultrasonicTrigPin = 32;
-const int ultrasonicEchoPin = 33;
-
+	// Bool Inputs & Sensors
+const int cupPresencePin = 30;
+const int ultrasonicTrigPin = 31;
+const int ultrasonicEchoPin = 32;
+	// Bool Outputs
+const int heatingCoil = 33;
 const int waterPump = 34;
 const int airPump = 35;
 
@@ -27,7 +31,7 @@ const int waterReservoir = A1;
 const int waterFill = A2;  // Water level probe inside boiler for regular size
 const int waterFillMax = A3; // Water level probe inside boiler for max size
 
-// Define constants
+// Define other constants
 const int STEPS_PER_REVOLUTION = 200; // Stepper value
 const int dispenseTime = 5000;  // Adjust as needed
 const float Rref = 50000.0;  // Reference resistance
@@ -57,7 +61,6 @@ TeaType teaTypes[] = {
 };
 
 
-
 // Define variables
 int currentTeaIndex = 0;
 unsigned long selectedTeaTime = teaTypes[currentTeaIndex].time;
@@ -65,11 +68,22 @@ int selectedTeaTemp = teaTypes[currentTeaIndex].temp;
 TeaType currentTea = {"White Tea", 270000, 79};  // Default tea type
 int teaTimeAdjustment = 0;
 
+
+
+// MAIN CODE STARTS HERE
+// MAIN CODE STARTS HERE
+// MAIN CODE STARTS HERE
+
+
+
 //Setup - Runs once
 
 void setup() {
 	Serial.begin(9600);
 	Serial.print("The program has begun");
+	pinMode(loadButton, INPUT_PULLUP);
+	pinMode(nextButton, INPUT_PULLUP);
+	pinMode(heatingCoil, OUTPUT);
 }
 
 //Main program
@@ -100,21 +114,21 @@ void startupInit() { // Code for startup initialization
   pivotServo.write(0); // Rotate grabber to SOUTH
 }
 
+
 void loadGrabber() {
-  // Code for loading the grabber
-  grabberServo.write(90);  // Close grabber
-  while (digitalRead(loadButtonPin) == LOW) {
-    // Wait for load button press
-  }
-  grabberServo.write(0);  // Open grabber
-  while (digitalRead(loadButtonPin) == HIGH) {
-    // Wait for load button release
-  }
-  // Wait for next button press
-  while (digitalRead(nextButtonPin) == LOW) {
-    // Wait for next button press
+  // Code for loading the grabber. This usses INPUT_PULLUP so the logic is reversed. The input reads HIGH when the button is open (not pushed) and LOW when the circuit is closed (pushed).
+  grabberServo.write(90);  // Start by closing the grabber
+  
+  while (digitalRead(nextButton) == HIGH) {  // While the nextButton is not pressed, loop the following
+	
+    if (digitalRead(loadButton) == LOW) {  // If the load button is pushed, this becomes low, grabber opens.
+      grabberServo.write(0);
+    } else { // Otherwise, the load button is not pressed, and the grabber becomes closed (servo 90 degrees)
+      grabberServo.write(90);
+    }
   }
 }
+
 
 void teaSelection() {
   // Rotary encoder allows the user to scroll through a list of teas from an array called "teaTypes"
