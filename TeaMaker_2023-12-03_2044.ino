@@ -2,53 +2,53 @@
 #include <Servo.h>
 #include <Stepper.h>
 #include <LiquidCrystal.h>
-// #include "TeaTypes.h"  // Can use external loading of this DB later
 
 // Define Digital IO pin numbers - Skip Pin 13 if possible
+
+	// Movement with PWM Pins
+const int pivotServoPin = 4; // PWM Pin
+const int grabberServoPin = 5; // PWM Pin
+const int elevatorRackStepPin = 6; // PWM Pin
+const int elevatorRackDirPin = 7; // PWM Pin
+const int elevatorRackLimitSwitchPin = 8; // PWM Pin
 
 	// User Input
 const int loadButton = 22;
 const int nextButton = 23;
 const int rotaryInputPin = 24;
 
-	// Movement
-const int pivotServoPin = 25;
-const int grabberServoPin = 26;
-const int elevatorRackStepPin = 27;
-const int elevatorRackDirPin = 28;
-const int elevatorRackLimitSwitchPin = 29;
-
 	// Bool Inputs & Sensors
-const int cupPresencePin = 30;
-const int ultrasonicTrigPin = 31;
-const int ultrasonicEchoPin = 32;
+const int cupPresencePin = 44;
+const int ultrasonicTrigPin = 45;
+const int ultrasonicEchoPin = 46;
 
 	// Bool Outputs
-const int heatingCoil = 33;
-const int waterPump = 34;
-const int airPump = 35;
+const int heatingCoil = 47;
+const int waterPump = 48;
+const int airPump = 49;
 
-// Initialize the LCD with the number of columns and rows
-LiquidCrystal lcd(8, 9, 4, 5, 6, 7);
+// Creates an LCD object. Parameters: (rs, enable, d4, d5, d6, d7)
+LiquidCrystal lcd(30, 31, 32, 33 34, 35);
 
 /*
-LCD Pins               Arduino Pins
----------------------------------------
-LCD VCC ---------------> 5V
-LCD GND ---------------> GND
-LCD RS  ---------------> D8
-LCD RW  ---------------> GND
-LCD EN  ---------------> D9
-LCD D4  ---------------> D4
-LCD D5  ---------------> D5
-LCD D6  ---------------> D6
-LCD D7  ---------------> D7
-LCD Vo  ---------------> Connect to Potentiometer (for contrast control)
-                      ---> 5V (Potentiometer)
-                      ---> GND (Potentiometer)
-LCD Backlight Anode ---> 5V (with Resistor)
-LCD Backlight Cathode-> GND
+	LCD Pins               Arduino Pins
+	---------------------------------------
+	LCD VCC ---------------> 5V
+	LCD GND ---------------> GND
+	LCD RS  ---------------> D30
+	LCD RW  ---------------> GND
+	LCD EN  ---------------> D31
+	LCD D4  ---------------> D32
+	LCD D5  ---------------> D33
+	LCD D6  ---------------> D34
+	LCD D7  ---------------> D35
+	LCD Vo  ---------------> Connect to Potentiometer (for contrast control)
+						  ---> 5V (Potentiometer)
+						  ---> GND (Potentiometer)
+	LCD Backlight Anode ---> 5V (with Resistor (220 ohm))
+	LCD Backlight Cathode-> GND
 
+	LCD power consumption is 1.25mA
 */
 
 // Define Analog IO Pins
