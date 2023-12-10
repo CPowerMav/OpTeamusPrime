@@ -1,6 +1,7 @@
 // External includes
 #include <Servo.h>
 #include <Stepper.h>
+#include <LiquidCrystal.h>
 // #include "TeaTypes.h"  // Can use external loading of this DB later
 
 // Define Digital IO pin numbers - Skip Pin 13 if possible
@@ -16,14 +17,39 @@ const int grabberServoPin = 26;
 const int elevatorRackStepPin = 27;
 const int elevatorRackDirPin = 28;
 const int elevatorRackLimitSwitchPin = 29;
+
 	// Bool Inputs & Sensors
 const int cupPresencePin = 30;
 const int ultrasonicTrigPin = 31;
 const int ultrasonicEchoPin = 32;
+
 	// Bool Outputs
 const int heatingCoil = 33;
 const int waterPump = 34;
 const int airPump = 35;
+
+// Initialize the LCD with the number of columns and rows
+LiquidCrystal lcd(8, 9, 4, 5, 6, 7);
+
+/*
+LCD Pins               Arduino Pins
+---------------------------------------
+LCD VCC ---------------> 5V
+LCD GND ---------------> GND
+LCD RS  ---------------> D8
+LCD RW  ---------------> GND
+LCD EN  ---------------> D9
+LCD D4  ---------------> D4
+LCD D5  ---------------> D5
+LCD D6  ---------------> D6
+LCD D7  ---------------> D7
+LCD Vo  ---------------> Connect to Potentiometer (for contrast control)
+                      ---> 5V (Potentiometer)
+                      ---> GND (Potentiometer)
+LCD Backlight Anode ---> 5V (with Resistor)
+LCD Backlight Cathode-> GND
+
+*/
 
 // Define Analog IO Pins
 const int temperatureSensorPin = A0; 
@@ -84,6 +110,8 @@ void setup() {
 	pinMode(loadButton, INPUT_PULLUP);
 	pinMode(nextButton, INPUT_PULLUP);
 	pinMode(heatingCoil, OUTPUT);
+	lcd.begin(16, 2); // set up the LCD's number of columns and rows
+	lcd.print("OpTeaMus Prime"); // Print a message to the LCD.
 }
 
 //Main program
