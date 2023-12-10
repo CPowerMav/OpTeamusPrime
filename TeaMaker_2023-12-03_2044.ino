@@ -1,7 +1,7 @@
 // External includes
-#include <Servo.h>
-#include <Stepper.h>
-#include <LiquidCrystal.h>
+#include <Servo.h> // Arduino default servo motor library
+#include <Stepper.h> // Arduino default stepper motor library
+#include <LiquidCrystal.h> // Arduino default LCD display library
 
 // Define Digital IO pin numbers - Skip Pin 13 if possible
 
@@ -15,7 +15,7 @@ const int elevatorRackLimitSwitchPin = 8; // PWM Pin
 	// User Input
 const int loadButton = 22;
 const int nextButton = 23;
-const int rotaryInputPin = 24;
+const int rotaryInput = 24;
 
 	// Bool Inputs & Sensors
 const int cupPresencePin = 44;
@@ -28,7 +28,7 @@ const int waterPump = 48;
 const int airPump = 49;
 
 // Creates an LCD object. Parameters: (rs, enable, d4, d5, d6, d7)
-LiquidCrystal lcd(30, 31, 32, 33 34, 35);
+LiquidCrystal lcd(30, 31, 32, 33, 34, 35);
 
 /*
 	LCD Pins               Arduino Pins
