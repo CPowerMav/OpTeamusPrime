@@ -6,11 +6,11 @@
 // Define Digital IO pin numbers - Skip Pin 13 if possible
 
 	// Movement with PWM Pins
-const int pivotServoPin = 4; // PWM Pin
-const int grabberServoPin = 5; // PWM Pin
-const int elevatorRackStepPin = 6; // PWM Pin
-const int elevatorRackDirPin = 7; // PWM Pin
-const int elevatorRackLimitSwitchPin = 8; // PWM Pin
+const int pivotServo = 4; // PWM Pin
+const int grabberServo = 5; // PWM Pin
+const int elevatorRackStep = 6; // PWM Pin
+const int elevatorRackDir = 7; // PWM Pin
+const int elevatorRackLimitSwitch = 8; // PWM Pin
 
 	// User Input
 const int loadButton = 22;
@@ -18,9 +18,9 @@ const int nextButton = 23;
 const int rotaryInput = 24;
 
 	// Bool Inputs & Sensors
-const int cupPresencePin = 44;
-const int ultrasonicTrigPin = 45;
-const int ultrasonicEchoPin = 46;
+const int cupPresence = 44;
+const int ultrasonicTrig = 45;
+const int ultrasonicEcho = 46;
 
 	// Bool Outputs
 const int heatingCoil = 47;
@@ -52,7 +52,7 @@ LiquidCrystal lcd(30, 31, 32, 33, 34, 35);
 */
 
 // Define Analog IO Pins
-const int temperatureSensorPin = A0; 
+const int temperatureSensor = A0; 
 const int waterReservoir = A1;
 const int waterFill = A2;  // Water level probe inside boiler for regular size
 const int waterFillMax = A3; // Water level probe inside boiler for max size
@@ -68,7 +68,7 @@ const float beta = 3950.0;  // Beta value of the NTC thermistor
 // Create Servo and Stepper objects
 Servo pivotServo;
 Servo grabberServo;
-Stepper elevatorRack(STEPS_PER_REVOLUTION, elevatorRackStepPin, elevatorRackDirPin);
+Stepper elevatorRack(STEPS_PER_REVOLUTION, elevatorRackStep, elevatorRackDir);
 
 
 // Define Tea Types - External Include?
@@ -135,7 +135,7 @@ void startupInit() { // Code for startup initialization
   delay(1000); // Wait a second for it to arrive
   
   // Move gantry until limit switch is triggered
-  while (digitalRead(elevatorRackLimitSwitchPin) == HIGH) {
+  while (digitalRead(elevatorRackLimitSwitch) == HIGH) {
     elevatorRack.step(1);
   }
   elevatorRack.step(-10);  // Adjust as needed
@@ -224,7 +224,7 @@ void heatWater() {
   delay(2000);
 
   while (true) {
-    int temperatureReading = analogRead(temperatureSensorPin);
+    int temperatureReading = analogRead(temperatureSensor);
     float temperatureCelsius = calculateTemperature(temperatureReading);
 
     Serial.print("Temperature: ");
@@ -263,8 +263,8 @@ void shutDown() {
   // Activate latching circuit
 }
 
-float calculateTemperature(int temperatureSensorPin) {
-  float R = Rref * (1023.0 / (float)temperatureSensorPin - 1.0); // Calculate NTC resistance
+float calculateTemperature(int temperatureSensor) {
+  float R = Rref * (1023.0 / (float)temperatureSensor - 1.0); // Calculate NTC resistance
   float T = 1.0 / (1.0 / (nominal_temeprature + 273.15) + log(R / nominal_resistance) / beta);
   T -= 273.15; // convert absolute temp to C
   return T;
