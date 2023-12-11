@@ -46,12 +46,12 @@ const float beta = 3950.0;  // Beta value of the NTC thermistor
 const int startupDelay = 2000; // Update this to adjust startup delay globally
 const int generalDelay = 50; // Update this to adjust delays for button inputs
 const int servoDelay = 1000; // Update this to adjust delays for servos to arrive to set positions
+const int steepTimeAdjustInterval = 30000; // Adjust steep time by this increment in +/- milliseconds
 
 // Create Servo and Stepper objects
 Servo pivotServo;
 Servo grabberServo;
 Stepper elevatorRack(STEPS_PER_REVOLUTION, elevatorRackStep, elevatorRackDir);
-
 
 // Define Tea Types - External Include?
 struct TeaType {
@@ -68,7 +68,6 @@ TeaType teaTypes[] = {
   {"Herbal Tea", 800000, 99},
 };
 
-
 // Define variables
 int currentTeaIndex = 0;
 unsigned long selectedTeaTime = teaTypes[currentTeaIndex].time;
@@ -78,11 +77,11 @@ TeaType currentTea = {"White Tea", 270000, 79};  // Default tea type
 int teaTimeAdjustment = 0;
 
 
-
-// MAIN CODE STARTS HERE
-// MAIN CODE STARTS HERE
-// MAIN CODE STARTS HERE
-
+//					MAIN CODE STARTS HERE
+//			MAIN CODE STARTS HERE
+//	MAIN CODE STARTS HERE
+//			MAIN CODE STARTS HERE
+//					MAIN CODE STARTS HERE
 
 
 //Setup - Runs once
@@ -102,6 +101,7 @@ void setup() {
 //Main program
 
 void loop() {
+// Main loop calls functions declared below
   startupInit();
   loadGrabber();
   teaSelection();
@@ -113,7 +113,7 @@ void loop() {
   shutDown();
 }
 
-// Functions called by main program
+// Segment function declarations and operations
 
 void startupInit() {
   // Print messages to the LCD
@@ -150,7 +150,6 @@ void loadGrabber() {
     }
   }
 }
-
 
 void teaSelection() {
   // Clear the LCD display
@@ -207,15 +206,30 @@ void teaSelection() {
   }
 }
 
-
 void progAdjust() {
   // Allows the user to tweak or adjust teaTime variable by using the rotary encoder (rotaryInput) to add or subtract time from teaTime variable in increments of 30 seconds (30000ms)
   int encoderValue = 0;
   int encoderLastValue = 0;
+  
+  // Display "Adjust steep" on the first line
+  lcd.clear();
+  lcd.print("Adjust steep");
+  
   while (digitalRead(nextButton) == HIGH) {
     encoderValue += (digitalRead(rotaryInput) == HIGH) - (digitalRead(rotaryInput) == LOW);
+    
+    // Calculate adjusted steep time
+    int adjustedTime = selectedTeaTime + encoderValue * steepTimeAdjustInterval;
+
+    // Display plus or minus and the total time dynamically on the second line
+    lcd.setCursor(0, 1);
+    lcd.print(encoderValue > 0 ? "+" : "-");
+    lcd.print(abs(adjustedTime) / 1000);
+    lcd.print("s");
+
+    // Update selectedTeaTime if the encoder value changes
     if (encoderValue != encoderLastValue) {
-      selectedTeaTime += encoderValue * 30000;
+      selectedTeaTime = adjustedTime;
       encoderLastValue = encoderValue;
     }
     delay(generalDelay);
@@ -273,7 +287,6 @@ void heatWater() {
   // This can include controlling pumps or valves
 }
 
-
 void steepFunction() {
   // Code for steeping the tea bag
   // Lower tea bag, countdown, raise tea bag
@@ -301,28 +314,28 @@ float calculateTemperature(int temperatureSensor) {
 
 /*
 
-APPENDIX
+APPENDIX:
 
-A: LCD display
+	LCD display
 
-	LCD Pins               Arduino Pins
-	---------------------------------------
-	LCD VCC ---------------> 5V
-	LCD GND ---------------> GND
-	LCD RS  ---------------> D30
-	LCD RW  ---------------> GND
-	LCD EN  ---------------> D31
-	LCD D4  ---------------> D32
-	LCD D5  ---------------> D33
-	LCD D6  ---------------> D34
-	LCD D7  ---------------> D35
-	LCD Vo  ---------------> Connect to Potentiometer (for contrast control)
-						  ---> 5V (Potentiometer)
-						  ---> GND (Potentiometer)
-	LCD Backlight Anode ---> 5V (with Resistor (220 ohm))
-	LCD Backlight Cathode-> GND
+		LCD Pins               Arduino Pins
+		---------------------------------------
+		LCD VCC ---------------> 5V
+		LCD GND ---------------> GND
+		LCD RS  ---------------> D30
+		LCD RW  ---------------> GND
+		LCD EN  ---------------> D31
+		LCD D4  ---------------> D32
+		LCD D5  ---------------> D33
+		LCD D6  ---------------> D34
+		LCD D7  ---------------> D35
+		LCD Vo  ---------------> Connect to Potentiometer (for contrast control)
+							  ---> 5V (Potentiometer)
+							  ---> GND (Potentiometer)
+		LCD Backlight Anode ---> 5V (with Resistor (220 ohm))
+		LCD Backlight Cathode-> GND
 
-	LCD power consumption is 1.25mA
+		LCD power consumption is 1.25mA
 	
 	
 */
