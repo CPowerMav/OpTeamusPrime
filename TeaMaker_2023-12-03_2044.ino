@@ -27,29 +27,8 @@ const int heatingCoil = 47;
 const int waterPump = 48;
 const int airPump = 49;
 
-// Creates an LCD object. Parameters: (rs, enable, d4, d5, d6, d7)
+// Creates an LCD object. Parameters: (rs, enable, d4, d5, d6, d7) - See appendix below for LCD Pin wiring and assignments
 LiquidCrystal lcd(30, 31, 32, 33, 34, 35);
-
-/*
-	LCD Pins               Arduino Pins
-	---------------------------------------
-	LCD VCC ---------------> 5V
-	LCD GND ---------------> GND
-	LCD RS  ---------------> D30
-	LCD RW  ---------------> GND
-	LCD EN  ---------------> D31
-	LCD D4  ---------------> D32
-	LCD D5  ---------------> D33
-	LCD D6  ---------------> D34
-	LCD D7  ---------------> D35
-	LCD Vo  ---------------> Connect to Potentiometer (for contrast control)
-						  ---> 5V (Potentiometer)
-						  ---> GND (Potentiometer)
-	LCD Backlight Anode ---> 5V (with Resistor (220 ohm))
-	LCD Backlight Cathode-> GND
-
-	LCD power consumption is 1.25mA
-*/
 
 // Define Analog IO Pins
 const int temperatureSensor = A0; 
@@ -64,6 +43,9 @@ const float Rref = 50000.0;  // Reference resistance
 const float nominal_temeprature = 25.0;  // Nominal temperature in Celsius
 const float nominal_resistance = 50000.0;  // Nominal resistance at nominal temperature
 const float beta = 3950.0;  // Beta value of the NTC thermistor
+const int startupDelay = 2000; // Update this to adjust startup delay globally
+const int generalDelay = 50; // Update this to adjust delays for button inputs
+const int servoDelay = 1000; // Update this to adjust delays for servos to arrive to set positions
 
 // Create Servo and Stepper objects
 Servo pivotServo;
@@ -130,11 +112,17 @@ void loop() {
 
 // Functions called by main program
 
-void startupInit() { // Code for startup initialization
+void startupInit() {
+  // Print messages to the LCD
+  lcd.clear();
+  lcd.print("OpTeaMus Prime");
+  lcd.setCursor(0, 1);
+  lcd.print("Getting ready..");
+
   pivotServo.write(90); // Rotate grabber to EAST
-  delay(1000); // Wait a second for it to arrive
+  delay(servoDelay); // Wait a second for it to arrive
   
-  // Move gantry until limit switch is triggered
+  // Move gantry until the limit switch is triggered
   while (digitalRead(elevatorRackLimitSwitch) == HIGH) {
     elevatorRack.step(1);
   }
@@ -142,13 +130,16 @@ void startupInit() { // Code for startup initialization
   pivotServo.write(0); // Rotate grabber to SOUTH
 }
 
-
 void loadGrabber() {
-  // Code for loading the grabber. This usses INPUT_PULLUP so the logic is reversed. The input reads HIGH when the button is open (not pushed) and LOW when the circuit is closed (pushed).
+  // Print instructions to the LCD
+  lcd.clear();
+  lcd.print("Hold load btn");
+  lcd.setCursor(0, 1);
+  lcd.print("Then next");
+
   grabberServo.write(90);  // Start by closing the grabber
-  
+
   while (digitalRead(nextButton) == HIGH) {  // While the nextButton is not pressed, loop the following
-	
     if (digitalRead(loadButton) == LOW) {  // If the load button is pushed, this becomes low, grabber opens.
       grabberServo.write(0);
     } else { // Otherwise, the load button is not pressed, and the grabber becomes closed (servo 90 degrees)
@@ -157,26 +148,52 @@ void loadGrabber() {
   }
 }
 
-
 void teaSelection() {
-  // Rotary encoder allows the user to scroll through a list of teas from an array called "teaTypes"
+  // Clear the LCD display
+  lcd.clear();
+
+  // Display the heading on the first row
+  lcd.print("Select Tea");
+
+  // Display the current tea name on the second row
+  lcd.setCursor(0, 1);
+  lcd.print(teaTypes[currentTeaIndex].name);
+
+  // Rotary encoder variables
   int encoderValue = 0;
   int encoderLastValue = 0;
   int encoderMaxValue = sizeof(teaTypes) / sizeof(teaTypes[0]) - 1;
+
+  // While the nextButton is not pressed, allow the user to scroll through tea options
   while (digitalRead(nextButton) == HIGH) {
+    // Update encoder value based on the rotary input
     encoderValue += (digitalRead(rotaryInput) == HIGH) - (digitalRead(rotaryInput) == LOW);
+
+    // Ensure the encoder value stays within valid bounds
     if (encoderValue < 0) {
       encoderValue = encoderMaxValue;
     } else if (encoderValue > encoderMaxValue) {
       encoderValue = 0;
     }
+
+    // If the encoder value changes, update the selected tea and LCD display
     if (encoderValue != encoderLastValue) {
       currentTeaIndex = encoderValue;
       selectedTeaTime = teaTypes[currentTeaIndex].time;
       selectedTeaTemp = teaTypes[currentTeaIndex].temp;
+
+      // Clear the LCD and display the updated information
+      lcd.clear();
+      lcd.print("Select Tea");
+      lcd.setCursor(0, 1);
+      lcd.print(teaTypes[currentTeaIndex].name);
+
+      // Update the last encoder value
       encoderLastValue = encoderValue;
     }
-    delay(50);
+
+    // Delay to avoid rapid changes due to noise
+    delay(generalDelay);
   }
 }
 
@@ -190,7 +207,7 @@ void progAdjust() {
       selectedTeaTime += encoderValue * 30000;
       encoderLastValue = encoderValue;
     }
-    delay(50);
+    delay(generalDelay);
   }
 }
 
@@ -211,7 +228,7 @@ void preFlight() {
   
   // Wait for next button to be pressed
   while (digitalRead(nextButton) == HIGH) {
-    delay(100);
+    delay(generalDelay);
   }
 }
 
@@ -221,7 +238,7 @@ void heatWater() {
   digitalWrite(heatingCoil, HIGH);   // Heating coil is energized by activating a pin connected to a relay
 
   // Wait for the heating coil to warm up (adjust as needed)
-  delay(2000);
+  delay(startupDelay);
 
   while (true) {
     int temperatureReading = analogRead(temperatureSensor);
@@ -269,3 +286,32 @@ float calculateTemperature(int temperatureSensor) {
   T -= 273.15; // convert absolute temp to C
   return T;
 }
+
+
+/*
+
+APPENDIX
+
+A: LCD display
+
+	LCD Pins               Arduino Pins
+	---------------------------------------
+	LCD VCC ---------------> 5V
+	LCD GND ---------------> GND
+	LCD RS  ---------------> D30
+	LCD RW  ---------------> GND
+	LCD EN  ---------------> D31
+	LCD D4  ---------------> D32
+	LCD D5  ---------------> D33
+	LCD D6  ---------------> D34
+	LCD D7  ---------------> D35
+	LCD Vo  ---------------> Connect to Potentiometer (for contrast control)
+						  ---> 5V (Potentiometer)
+						  ---> GND (Potentiometer)
+	LCD Backlight Anode ---> 5V (with Resistor (220 ohm))
+	LCD Backlight Cathode-> GND
+
+	LCD power consumption is 1.25mA
+	
+	
+*/
