@@ -6,8 +6,8 @@
 // Define Digital IO pin numbers - Skip Pin 13 if possible
 
 	// Movement with PWM Pins
-const int pivotServo = 4; // PWM Pin
-const int grabberServo = 5; // PWM Pin
+const int pivotServoPin = 4; // PWM Pin
+const int grabberServoPin = 5; // PWM Pin
 const int elevatorRackStep = 6; // PWM Pin
 const int elevatorRackDir = 7; // PWM Pin
 const int elevatorRackLimitSwitch = 8; // PWM Pin
@@ -54,7 +54,7 @@ Stepper elevatorRack(STEPS_PER_REVOLUTION, elevatorRackStep, elevatorRackDir);
 
 
 // Define Tea Types - External Include?
-const struct TeaType {
+struct TeaType {
   const char* name;
   unsigned long time;
   int temp;
@@ -73,6 +73,7 @@ TeaType teaTypes[] = {
 int currentTeaIndex = 0;
 unsigned long selectedTeaTime = teaTypes[currentTeaIndex].time;
 int selectedTeaTemp = teaTypes[currentTeaIndex].temp;
+char selectedTeaName[15];
 TeaType currentTea = {"White Tea", 270000, 79};  // Default tea type
 int teaTimeAdjustment = 0;
 
@@ -94,6 +95,8 @@ void setup() {
 	pinMode(heatingCoil, OUTPUT);
 	lcd.begin(16, 2); // set up the LCD's number of columns and rows
 	lcd.print("OpTeaMus Prime"); // Print a message to the LCD.
+  grabberServo.attach(grabberServoPin);
+  pivotServo.attach(pivotServoPin);
 }
 
 //Main program
@@ -148,6 +151,7 @@ void loadGrabber() {
   }
 }
 
+
 void teaSelection() {
   // Clear the LCD display
   lcd.clear();
@@ -158,6 +162,9 @@ void teaSelection() {
   // Display the current tea name on the second row
   lcd.setCursor(0, 1);
   lcd.print(teaTypes[currentTeaIndex].name);
+
+  // Set the selectedTeaName variable
+  strcpy(selectedTeaName, teaTypes[currentTeaIndex].name); // Copy the tea name to the selectedTeaName variable
 
   // Rotary encoder variables
   int encoderValue = 0;
@@ -182,11 +189,14 @@ void teaSelection() {
       selectedTeaTime = teaTypes[currentTeaIndex].time;
       selectedTeaTemp = teaTypes[currentTeaIndex].temp;
 
+      // Copy the tea name to the selectedTeaName variable
+      strcpy(selectedTeaName, teaTypes[currentTeaIndex].name);
+
       // Clear the LCD and display the updated information
       lcd.clear();
       lcd.print("Select Tea");
       lcd.setCursor(0, 1);
-      lcd.print(teaTypes[currentTeaIndex].name);
+      lcd.print(selectedTeaName);
 
       // Update the last encoder value
       encoderLastValue = encoderValue;
@@ -196,6 +206,7 @@ void teaSelection() {
     delay(generalDelay);
   }
 }
+
 
 void progAdjust() {
   // Allows the user to tweak or adjust teaTime variable by using the rotary encoder (rotaryInput) to add or subtract time from teaTime variable in increments of 30 seconds (30000ms)
