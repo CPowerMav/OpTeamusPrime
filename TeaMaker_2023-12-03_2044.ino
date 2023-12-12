@@ -105,6 +105,7 @@ void setup() {
   Serial.print("The program has begun");
   pinMode(loadButton, INPUT_PULLUP);
   pinMode(nextButton, INPUT_PULLUP);
+  pinMode(elevatorRackLimitSwitch, INPUT_PULLUP); // Remember, HIGH means open circuit because of Pullup
   pinMode(heatingCoil, OUTPUT);
   lcd.begin(16, 2); // set up the LCD's number of columns and rows
   lcd.print("OpTeaMus Prime"); // Print a message to the LCD.
@@ -252,24 +253,31 @@ void progAdjust() {
 
 void preFlight() {
   // Check ultrasonic sensor to ensure a cup is placed for dispensing hot water into it
-  if (digitalRead(cupPresence) == LOW) {
-    // Cup is present
-  } else {
+  if (digitalRead(cupPresence) == HIGH) {
     // Cup is not present
+    lcd.clear();
+    lcd.print("Place a cup");
+    while(digitalRead(cupPresence) == HIGH); // Wait here until a cup is placed
   }
   
   // Check boolean sensor to ensure the water reservoir has enough water to perform water heating/brewing/steeping
-  if (digitalRead(waterReservoir) == HIGH) {
-    // Water reservoir has enough water
-  } else {
+  if (digitalRead(waterReservoir) == LOW) {
     // Water reservoir is empty
+    lcd.clear();
+    lcd.print("Add water");
+    while(digitalRead(waterReservoir) == LOW); // Wait here until water is refilled
   }
   
   // Wait for next button to be pressed
+  lcd.clear();
+  lcd.print("Press Next");
+  lcd.setCursor(0, 1); // Move cursor to the beginning of the second row
+  lcd.print("to Start");
   while (digitalRead(nextButton) == HIGH) {
     delay(generalDelay);
   }
 }
+
 
 void heatWater() {
   // Water is pumped from the reservoir to the boiler
