@@ -53,6 +53,20 @@ Servo pivotServo;
 Servo grabberServo;
 Stepper elevatorRack(STEPS_PER_REVOLUTION, elevatorRackStep, elevatorRackDir);
 
+// Word substitutions for pivotServo positions
+
+const int NORTH = 180; // For pivotServo pointing straight up
+const int EAST = 90; // For pivotServo pointing to the right
+const int SOUTH = 0; // For pivotServo pointing straight down
+const int SEAST = 45; // For pivotServo down and right
+const int NEAST = 135; // For pivotServo up and right
+
+// Word substitutions for grabberServo positions
+
+const int CLOSE = 90; // Grabber servo closed position (90 deg)
+const int OPEN = 0; // Grabber servo open position (0 deg)
+
+
 // Define Tea Types - External Include?
 struct TeaType {
   const char* name;
@@ -87,13 +101,13 @@ int teaTimeAdjustment = 0;
 //Setup - Runs once
 
 void setup() {
-	Serial.begin(9600);
-	Serial.print("The program has begun");
-	pinMode(loadButton, INPUT_PULLUP);
-	pinMode(nextButton, INPUT_PULLUP);
-	pinMode(heatingCoil, OUTPUT);
-	lcd.begin(16, 2); // set up the LCD's number of columns and rows
-	lcd.print("OpTeaMus Prime"); // Print a message to the LCD.
+  Serial.begin(9600);
+  Serial.print("The program has begun");
+  pinMode(loadButton, INPUT_PULLUP);
+  pinMode(nextButton, INPUT_PULLUP);
+  pinMode(heatingCoil, OUTPUT);
+  lcd.begin(16, 2); // set up the LCD's number of columns and rows
+  lcd.print("OpTeaMus Prime"); // Print a message to the LCD.
   grabberServo.attach(grabberServoPin);
   pivotServo.attach(pivotServoPin);
 }
@@ -122,7 +136,7 @@ void startupInit() {
   lcd.setCursor(0, 1);
   lcd.print("Getting ready..");
 
-  pivotServo.write(90); // Rotate grabber to EAST
+  pivotServo.write(EAST); // Rotate grabber to EAST
   delay(servoDelay); // Wait a second for it to arrive
   
   // Move gantry until the limit switch is triggered
@@ -130,7 +144,7 @@ void startupInit() {
     elevatorRack.step(1);
   }
   elevatorRack.step(-10);  // Adjust as needed
-  pivotServo.write(0); // Rotate grabber to SOUTH
+  pivotServo.write(SOUTH); // Rotate grabber to SOUTH
 }
 
 void loadGrabber() {
@@ -140,13 +154,13 @@ void loadGrabber() {
   lcd.setCursor(0, 1);
   lcd.print("Then next");
 
-  grabberServo.write(90);  // Start by closing the grabber
+  grabberServo.write(CLOSE);  // Start by closing the grabber
 
   while (digitalRead(nextButton) == HIGH) {  // While the nextButton is not pressed, loop the following
     if (digitalRead(loadButton) == LOW) {  // If the load button is pushed, this becomes low, grabber opens.
-      grabberServo.write(0);
+      grabberServo.write(OPEN);
     } else { // Otherwise, the load button is not pressed, and the grabber becomes closed (servo 90 degrees)
-      grabberServo.write(90);
+      grabberServo.write(CLOSE);
     }
   }
 }
