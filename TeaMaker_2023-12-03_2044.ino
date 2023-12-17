@@ -87,8 +87,8 @@ int currentTeaIndex = 0;
 unsigned long selectedTeaTime = teaParams[currentTeaIndex].time;
 int selectedTeaTemp = teaParams[currentTeaIndex].temp;
 char selectedTeaName[15];
-teaRecipe currentTea = {"White Tea", 270000, 79};  // Default tea type
-int teaTimeAdjustment = 0;
+// teaRecipe currentTea = {"White Tea", 270000, 79};  // Default tea type - Commented out for now. Don't think i need this.
+// int teaTimeAdjustment = 0; - Unused variable for now
 
 
 //					MAIN CODE STARTS HERE
