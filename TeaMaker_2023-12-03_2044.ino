@@ -68,13 +68,13 @@ const int OPEN = 0; // Grabber servo open position (0 deg)
 
 
 // Define Tea Types - External Include?
-struct TeaType {
+struct teaRecipe {
   const char* name;
   unsigned long time;
   int temp;
 };
 
-TeaType teaTypes[] = {
+teaRecipe teaParams[] = {
   {"White Tea", 270000, 79},
   {"Green Tea", 240000, 79},
   {"Black Tea", 210000, 91},
@@ -84,10 +84,10 @@ TeaType teaTypes[] = {
 
 // Define variables
 int currentTeaIndex = 0;
-unsigned long selectedTeaTime = teaTypes[currentTeaIndex].time;
-int selectedTeaTemp = teaTypes[currentTeaIndex].temp;
+unsigned long selectedTeaTime = teaParams[currentTeaIndex].time;
+int selectedTeaTemp = teaParams[currentTeaIndex].temp;
 char selectedTeaName[15];
-TeaType currentTea = {"White Tea", 270000, 79};  // Default tea type
+teaRecipe currentTea = {"White Tea", 270000, 79};  // Default tea type
 int teaTimeAdjustment = 0;
 
 
@@ -175,15 +175,15 @@ void teaSelection() {
 
   // Display the current tea name on the second row
   lcd.setCursor(0, 1);
-  lcd.print(teaTypes[currentTeaIndex].name);
+  lcd.print(teaParams[currentTeaIndex].name);
 
   // Set the selectedTeaName variable
-  strcpy(selectedTeaName, teaTypes[currentTeaIndex].name); // Copy the tea name to the selectedTeaName variable
+  strcpy(selectedTeaName, teaParams[currentTeaIndex].name); // Copy the tea name to the selectedTeaName variable
 
   // Rotary encoder variables
   int encoderValue = 0;
   int encoderLastValue = 0;
-  int encoderMaxValue = sizeof(teaTypes) / sizeof(teaTypes[0]) - 1;
+  int encoderMaxValue = sizeof(teaParams) / sizeof(teaParams[0]) - 1;
 
   // While the nextButton is not pressed, allow the user to scroll through tea options
   while (digitalRead(nextButton) == HIGH) {
@@ -200,11 +200,11 @@ void teaSelection() {
     // If the encoder value changes, update the selected tea and LCD display
     if (encoderValue != encoderLastValue) {
       currentTeaIndex = encoderValue;
-      selectedTeaTime = teaTypes[currentTeaIndex].time;
-      selectedTeaTemp = teaTypes[currentTeaIndex].temp;
+      selectedTeaTime = teaParams[currentTeaIndex].time;
+      selectedTeaTemp = teaParams[currentTeaIndex].temp;
 
       // Copy the tea name to the selectedTeaName variable
-      strcpy(selectedTeaName, teaTypes[currentTeaIndex].name);
+      strcpy(selectedTeaName, teaParams[currentTeaIndex].name);
 
       // Clear the LCD and display the updated information
       lcd.clear();
