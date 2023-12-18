@@ -216,8 +216,11 @@ void teaSelection() {
   int encoderLastValue = 0;
   int encoderMaxValue = sizeof(teaParams) / sizeof(teaParams[0]) - 1;
 
+  // Debounce object for nextButton
+  nextButtonDebouncer.update();
+
   // While the nextButton is not pressed, allow the user to scroll through tea options
-  while (digitalRead(nextButton) == HIGH) {
+  while (nextButtonDebouncer.read() == HIGH) {
     // Update encoder value based on the rotary input
     encoderValue += (digitalRead(rotaryInput) == HIGH) - (digitalRead(rotaryInput) == LOW);
 
@@ -247,23 +250,40 @@ void teaSelection() {
       encoderLastValue = encoderValue;
     }
 
+    // Check and debounce nextButton
+    nextButtonDebouncer.update();
+
+    if (nextButtonDebouncer.fell()) {
+      // Call the progAdjust function when the nextButton is pressed
+      progAdjust();
+      return;  // exit the teaSelection function
+    }
+
     // Delay to avoid rapid changes due to noise
     delay(generalDelay);
   }
 }
 
+
 void progAdjust() {
-  // Allows the user to tweak or adjust teaTime variable by using the rotary encoder (rotaryInput) to add or subtract time from teaTime variable in increments of 30 seconds (30000ms)
+  // Allows the user to tweak or adjust teaTime variable by using the rotary encoder (rotaryInput)
+  // to add or subtract time from teaTime variable in increments of 30 seconds (30000ms)
+  
+  // Rotary encoder variables
   int encoderValue = 0;
   int encoderLastValue = 0;
-  
+
+  // Debounce object for nextButton
+  nextButtonDebouncer.update();
+
   // Display "Adjust steep" on the first line
   lcd.clear();
   lcd.print("Adjust steep");
-  
-  while (digitalRead(nextButton) == HIGH) {
+
+  while (nextButtonDebouncer.read() == HIGH) {
+    // Update encoder value based on the rotary input
     encoderValue += (digitalRead(rotaryInput) == HIGH) - (digitalRead(rotaryInput) == LOW);
-    
+
     // Calculate adjusted steep time
     int adjustedTime = selectedTeaTime + encoderValue * steepTimeAdjustInterval;
 
@@ -273,11 +293,21 @@ void progAdjust() {
     lcd.print(abs(adjustedTime) / 1000);
     lcd.print("s");
 
+    // Check and debounce nextButton
+    nextButtonDebouncer.update();
+
+    if (nextButtonDebouncer.fell()) {
+      // Exit the function if the nextButton is pressed
+      return;
+    }
+
     // Update selectedTeaTime if the encoder value changes
     if (encoderValue != encoderLastValue) {
       selectedTeaTime = adjustedTime;
       encoderLastValue = encoderValue;
     }
+
+    // Delay to avoid rapid changes due to noise
     delay(generalDelay);
   }
 }
