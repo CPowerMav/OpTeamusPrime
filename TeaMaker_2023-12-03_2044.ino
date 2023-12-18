@@ -95,6 +95,7 @@ char selectedTeaName[15];
 // teaRecipe currentTea = {"White Tea", 270000, 79};  // Default tea type - Commented out for now. Don't think i need this.
 // int teaTimeAdjustment = 0; - Commented out for now. Unused variable.
 const int debounceInterval = 10; // Button debounce interval in milliseconds
+int cupSizeSelection = 0;  // Variable to store whcih size the user selects (0 is small, 1 is large)
 
 
 
@@ -142,6 +143,7 @@ void loop() {
   loadGrabber();
   teaSelection();
   progAdjust();
+  selectCupSize();
   preFlight();
   heatWater();
   steepFunction();
@@ -165,8 +167,8 @@ void startupInit() {
   while (digitalRead(elevatorRackLimitSwitch) == HIGH) {
     elevatorRack.step(1);
   }
-  elevatorRack.step(-10);  // Adjust as needed
-  pivotServo.write(SOUTH); // Rotate grabber to SOUTH
+  elevatorRack.step(-10);  // After the limit switch is activated, move thee gantry down again a bit. Adjust as needed.
+  pivotServo.write(SOUTH); // Now that the the elevator is at the top position, rotate grabber to SOUTH
 }
 
 void loadGrabber() {
@@ -264,6 +266,54 @@ void teaSelection() {
   }
 }
 
+void selectCupSize() {
+  // Clear the LCD display
+  lcd.clear();
+
+  // Display the cup size selection prompt on the first row
+  lcd.print("Select Cup Size");
+
+  // Display the current cup size on the second row
+  lcd.setCursor(0, 1);
+  lcd.print("Small   Large");
+
+  // Rotary encoder variables
+  int encoderValue = 0;
+  int encoderLastValue = 0;
+
+  // While the nextButton is not pressed, allow the user to scroll through cup size options
+  while (nextButtonDebouncer.read() == HIGH) {
+    // Update encoder value based on the rotary input
+    encoderValue += (digitalRead(rotaryInput) == HIGH) - (digitalRead(rotaryInput) == LOW);
+
+    // Ensure the encoder value stays within valid bounds (0 for Small, 1 for Large)
+    encoderValue = constrain(encoderValue, 0, 1);
+
+    // If the encoder value changes, update the LCD display
+    if (encoderValue != encoderLastValue) {
+      lcd.setCursor(0, 1);
+      lcd.print(encoderValue == 0 ? ">Small   Large" : " Small   >Large");
+
+      // Update the last encoder value
+      encoderLastValue = encoderValue;
+    }
+
+    // Check and debounce nextButton
+    nextButtonDebouncer.update();
+
+    if (nextButtonDebouncer.fell()) {
+      // User made a selection, update the global variable
+      cupSizeSelection = encoderValue;
+
+      // Exit the function
+      return;
+    }
+
+    // Delay to avoid rapid changes due to noise
+    delay(generalDelay);
+  }
+}
+
 
 void progAdjust() {
   // Allows the user to tweak or adjust teaTime variable by using the rotary encoder (rotaryInput)
@@ -339,21 +389,47 @@ void preFlight() {
   }
 }
 
+void pumpWater() {  // Function to pump water from the reservoir to the boiler
 
+  digitalWrite(waterPump, HIGH); // Activate the water pump
+
+  // Check which water fill probe to use based on cup size selection
+  int waterFillProbe;
+
+  if (cupSizeSelection == 0) {
+    waterFillProbe = waterFill;
+  } else {
+    waterFillProbe = waterFillMax;
+  }
+
+  // Wait until the water reaches the selected water fill probe level
+  while (digitalRead(waterFillProbe) == LOW) {
+    // Delay to avoid rapid checking
+    delay(generalDelay);
+  }
+
+  digitalWrite(waterPump, LOW); // Stop the water pump
+}
+
+
+// Function to heat water in the boiler
 void heatWater() {
-  // Water is pumped from the reservoir to the boiler
-  
-  digitalWrite(heatingCoil, HIGH);   // Heating coil is energized by activating a pin connected to a relay
+  digitalWrite(heatingCoil, HIGH); // Activate the heating coil
 
   // Wait for the heating coil to warm up (adjust as needed)
   delay(startupDelay);
+
+  lcd.clear();
+  lcd.print("Heating Water");
 
   while (true) {
     int temperatureReading = analogRead(temperatureSensor);
     float temperatureCelsius = calculateTemperature(temperatureReading);
 
-    Serial.print("Temperature: ");
-    Serial.println(temperatureCelsius);
+    lcd.setCursor(0, 1);
+    lcd.print("Temp: ");
+    lcd.print(temperatureCelsius);
+    lcd.print(" C   ");
 
     // Check if the current temperature is below the target temperature
     if (temperatureCelsius < selectedTeaTemp) {
@@ -364,11 +440,14 @@ void heatWater() {
       digitalWrite(heatingCoil, LOW);
       break;
     }
+
+    // Delay to avoid rapid checking
+    delay(generalDelay);
   }
 
-  // Add additional code here for dispensing water into the cup based on dispenseTime
-  // This can include controlling pumps or valves
+  lcd.clear();
 }
+
 
 void steepFunction() {
   // Code for steeping the tea bag
