@@ -2,6 +2,8 @@
 #include <Servo.h> // Arduino default servo motor library
 #include <Stepper.h> // Arduino default stepper motor library
 #include <LiquidCrystal.h> // Arduino default LCD display library
+#include <Bounce2.h> // Button debouncing library
+
 
 // Define Digital IO pin numbers - Skip Pin 13 if possible
 
@@ -16,6 +18,9 @@ const int elevatorRackLimitSwitch = 8; // PWM Pin
 const int loadButton = 22;
 const int nextButton = 23;
 const int rotaryInput = 24;
+Bounce loadButtonDebouncer = Bounce();
+Bounce nextButtonDebouncer = Bounce();
+
 
 	// Bool Inputs & Sensors
 const int cupPresence = 44;
@@ -88,7 +93,14 @@ unsigned long selectedTeaTime = teaParams[currentTeaIndex].time;
 int selectedTeaTemp = teaParams[currentTeaIndex].temp;
 char selectedTeaName[15];
 // teaRecipe currentTea = {"White Tea", 270000, 79};  // Default tea type - Commented out for now. Don't think i need this.
-// int teaTimeAdjustment = 0; - Unused variable for now
+// int teaTimeAdjustment = 0; - Commented out for now. Unused variable.
+const int debounceInterval = 10; // Button debounce interval in milliseconds
+
+
+
+
+
+
 
 
 //					MAIN CODE STARTS HERE
@@ -98,19 +110,28 @@ char selectedTeaName[15];
 //					MAIN CODE STARTS HERE
 
 
+
+
+
+
+
+
 //Setup - Runs once
 
 void setup() {
   Serial.begin(9600);
   Serial.print("The program has begun");
-  pinMode(loadButton, INPUT_PULLUP);
-  pinMode(nextButton, INPUT_PULLUP);
   pinMode(elevatorRackLimitSwitch, INPUT_PULLUP); // Remember, HIGH means open circuit because of Pullup
   pinMode(heatingCoil, OUTPUT);
   lcd.begin(16, 2); // set up the LCD's number of columns and rows
   lcd.print("OpTeaMus Prime"); // Print a message to the LCD.
   grabberServo.attach(grabberServoPin);
   pivotServo.attach(pivotServoPin);
+  // Initialize debouncers with the shared debounce interval
+  loadButtonDebouncer.attach(loadButton, INPUT_PULLUP);
+  loadButtonDebouncer.interval(debounceInterval);
+  nextButtonDebouncer.attach(nextButton, INPUT_PULLUP);
+  nextButtonDebouncer.interval(debounceInterval);
 }
 
 //Main program
@@ -157,14 +178,24 @@ void loadGrabber() {
 
   grabberServo.write(CLOSE);  // Start by closing the grabber
 
-  while (digitalRead(nextButton) == HIGH) {  // While the nextButton is not pressed, loop the following
-    if (digitalRead(loadButton) == LOW) {  // If the load button is pushed, this becomes low, grabber opens.
+  while (digitalRead(nextButton) == HIGH) {
+    // Update debouncer for loadButton
+    loadButtonDebouncer.update();
+
+    // Check debounced button state
+    if (loadButtonDebouncer.fell()) {
+      // Load button pressed
       grabberServo.write(OPEN);
-    } else { // Otherwise, the load button is not pressed, and the grabber becomes closed (servo 90 degrees)
+      // Add additional logic or code to handle the button press action
+    } else {
+      // Load button not pressed, keep the grabber closed
       grabberServo.write(CLOSE);
+	  delay(generalDelay); // Wait for the servo to close and move on to teaSelection 
+	  break;  // Exit the loop if nextButton is pressed
     }
   }
 }
+
 
 void teaSelection() {
   // Clear the LCD display
