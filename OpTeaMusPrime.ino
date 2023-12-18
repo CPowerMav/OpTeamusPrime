@@ -384,10 +384,15 @@ void preFlight() {
   lcd.print("Press Next");
   lcd.setCursor(0, 1); // Move cursor to the beginning of the second row
   lcd.print("to Start");
-  while (digitalRead(nextButton) == HIGH) {
+
+  // Update the debouncer before checking the button state
+  nextButtonDebouncer.update();
+
+  while (nextButtonDebouncer.read() == HIGH) {
     delay(generalDelay);
   }
 }
+
 
 void pumpWater() {  // Function to pump water from the reservoir to the boiler
 
