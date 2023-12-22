@@ -56,7 +56,6 @@ const int generalDelay = 50; // Update this to adjust the general delay time for
 const int servoDelay = 1000; // Update this to adjust delays for servos to arrive to set positions - Need to update this to watch servo location from servo.read
 const int steepTimeAdjustInterval = 30000; // Adjust steep time by this increment in +/- milliseconds
 const int referenceOffset = 10;  // Distance down from the limit switch to establish the reference position
-const int referenceOffset = 10;  // Distance down from the limit switch to establish the reference position
 const float ballscrewPitch = 2.0;  // Ballscrew pitch in mm per revolution
 const float pitchToDistance = 360.0 / ballscrewPitch;  // Conversion factor for stepper motor rotation to distance
 
@@ -526,11 +525,13 @@ void steepFunction() {
   elevatorRack.runToPosition();  // Wait for the move to complete
 }
 
+
 void disposeBag() {
   // Code for disposing of the tea bag
   // Listen to ultrasonic sensor, move gantry, rotate arm, release grabber, move gantry
   // Wait for next button press
 }
+
 
 void shutDown() {
   // Code for shutting down the unit
