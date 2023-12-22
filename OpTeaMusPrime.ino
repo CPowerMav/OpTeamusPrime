@@ -3,6 +3,7 @@
 #include <Stepper.h> // Arduino default stepper motor library
 #include <LiquidCrystal.h> // Arduino default LCD display library
 #include <Bounce2.h> // Button debouncing library
+#include <Encoder.h> // Rotary encoder library
 
 
 // Define Digital IO pin numbers - Skip Pin 13 if possible
@@ -12,20 +13,22 @@ const int pivotServoPin = 4; // PWM Pin
 const int grabberServoPin = 5; // PWM Pin
 const int elevatorRackStep = 6; // PWM Pin
 const int elevatorRackDir = 7; // PWM Pin
-const int elevatorRackLimitSwitch = 8; // PWM Pin
 
 	// User Input
-const int loadButton = 22;
-const int nextButton = 23;
-const int rotaryInput = 24;
+const int loadButton = 22; // Pulled up and debounced in setup
+const int nextButton = 23; // Pulled up and debounced in setup
+const int rotaryButton = 24; // Rotary encoder SW pin
+const int rotaryA = 2; // DT Pin - Interrupt capable pin
+const int rotaryB = 3; // CLK Pin - Interrupt capable pin
+Encoder selectorKnob(rotaryA, rotaryB); // Create Encoder object for rotary encoder "Encoder" class called "selectorKnob".
 Bounce loadButtonDebouncer = Bounce();
 Bounce nextButtonDebouncer = Bounce();
-
 
 	// Bool Inputs & Sensors
 const int cupPresence = 44;
 const int ultrasonicTrig = 45;
 const int ultrasonicEcho = 46;
+const int elevatorRackLimitSwitch = 8; // Limit switch pulled high in setup
 
 	// Bool Outputs
 const int heatingCoil = 47;
@@ -36,14 +39,14 @@ const int airPump = 49;
 LiquidCrystal lcd(30, 31, 32, 33, 34, 35);
 
 // Define Analog IO Pins
-const int temperatureSensor = A0; 
-const int waterReservoir = A1;
+const int temperatureSensor = A0; // NTC Thermistor on voltage divider
+const int waterReservoir = A1;  // Water level probes inside cold water reservoir tank (outside tube 2 wires)
 const int waterFill = A2;  // Water level probe inside boiler for regular size
 const int waterFillMax = A3; // Water level probe inside boiler for max size
 
 // Define other constants
 const int STEPS_PER_REVOLUTION = 200; // Stepper value
-const int dispenseTime = 5000;  // Adjust as needed
+const int dispenseDuration = 5000;  // Adjust as needed
 const float Rref = 50000.0;  // Reference resistance
 const float nominal_temeprature = 25.0;  // Nominal temperature in Celsius
 const float nominal_resistance = 50000.0;  // Nominal resistance at nominal temperature
@@ -92,8 +95,6 @@ int currentTeaIndex = 0;
 unsigned long selectedTeaTime = teaParams[currentTeaIndex].time;
 int selectedTeaTemp = teaParams[currentTeaIndex].temp;
 char selectedTeaName[15];
-// teaRecipe currentTea = {"White Tea", 270000, 79};  // Default tea type - Commented out for now. Don't think i need this.
-// int teaTimeAdjustment = 0; - Commented out for now. Unused variable.
 const int debounceInterval = 10; // Button debounce interval in milliseconds
 int cupSizeSelection = 0;  // Variable to store whcih size the user selects (0 is small, 1 is large)
 
@@ -117,14 +118,20 @@ int cupSizeSelection = 0;  // Variable to store whcih size the user selects (0 i
 
 
 
-//Setup - Runs once
+
 
 void setup() {
+//Setup - Runs once
   Serial.begin(9600);
-  Serial.print("The program has begun");
+  Serial.println("Void setup is running");
+  
+// PinModes - Most are set by library used like Encoder automatically setting pins to pullup
   pinMode(elevatorRackLimitSwitch, INPUT_PULLUP); // Remember, HIGH means open circuit because of Pullup
   pinMode(heatingCoil, OUTPUT);
-  lcd.begin(16, 2); // set up the LCD's number of columns and rows
+  pinMode(airPump, OUTPUT);
+  pinMode(waterPump, OUTPUT);
+  lcd.begin(16, 2); // Set up the LCD's number of columns and rows
+  lcd.clear(); // Start by clearing the LCD
   lcd.print("OpTeaMus Prime"); // Print a message to the LCD.
   grabberServo.attach(grabberServoPin);
   pivotServo.attach(pivotServoPin);
@@ -135,10 +142,9 @@ void setup() {
   nextButtonDebouncer.interval(debounceInterval);
 }
 
-//Main program
-
 void loop() {
 // Main loop calls functions declared below
+  Serial.println("The main loop function is starting");
   startupInit();
   loadGrabber();
   teaSelection();
@@ -151,9 +157,20 @@ void loop() {
   shutDown();
 }
 
-// Segment function declarations and operations
+
+
+
+
+
+// Main functions written below are called by main loop
+
+
+
+
+
 
 void startupInit() {
+  Serial.println("startupInit fucnction is running");
   // Print messages to the LCD
   lcd.clear();
   lcd.print("OpTeaMus Prime");
@@ -172,6 +189,7 @@ void startupInit() {
 }
 
 void loadGrabber() {
+  Serial.println("loadGrabber fucnction is running");
   // Print instructions to the LCD
   lcd.clear();
   lcd.print("Hold load btn");
@@ -200,6 +218,7 @@ void loadGrabber() {
 
 
 void teaSelection() {
+  Serial.println("teaSelection fucnction is running");
   // Clear the LCD display
   lcd.clear();
 
@@ -213,29 +232,20 @@ void teaSelection() {
   // Set the selectedTeaName variable
   strcpy(selectedTeaName, teaParams[currentTeaIndex].name); // Copy the tea name to the selectedTeaName variable
 
-  // Rotary encoder variables
-  int encoderValue = 0;
-  int encoderLastValue = 0;
-  int encoderMaxValue = sizeof(teaParams) / sizeof(teaParams[0]) - 1;
-
-  // Debounce object for nextButton
-  nextButtonDebouncer.update();
-
   // While the nextButton is not pressed, allow the user to scroll through tea options
   while (nextButtonDebouncer.read() == HIGH) {
-    // Update encoder value based on the rotary input
-    encoderValue += (digitalRead(rotaryInput) == HIGH) - (digitalRead(rotaryInput) == LOW);
+    // Read changes from the selectorKnob
+    int selectorKnobChange = selectorKnob.read();
 
-    // Ensure the encoder value stays within valid bounds
-    if (encoderValue < 0) {
-      encoderValue = encoderMaxValue;
-    } else if (encoderValue > encoderMaxValue) {
-      encoderValue = 0;
-    }
+    // Update selectorKnobValue based on the change
+    int selectorKnobValue = selectorKnobChange;
 
-    // If the encoder value changes, update the selected tea and LCD display
-    if (encoderValue != encoderLastValue) {
-      currentTeaIndex = encoderValue;
+    // Ensure the selectorKnob value stays within valid bounds
+    selectorKnobValue = constrain(selectorKnobValue, 0, sizeof(teaParams) / sizeof(teaParams[0]) - 1);
+
+    // If the selectorKnob value changes, update the selected tea and LCD display
+    if (selectorKnobChange != 0) {
+      currentTeaIndex = selectorKnobValue;
       selectedTeaTime = teaParams[currentTeaIndex].time;
       selectedTeaTemp = teaParams[currentTeaIndex].temp;
 
@@ -247,9 +257,6 @@ void teaSelection() {
       lcd.print("Select Tea");
       lcd.setCursor(0, 1);
       lcd.print(selectedTeaName);
-
-      // Update the last encoder value
-      encoderLastValue = encoderValue;
     }
 
     // Check and debounce nextButton
@@ -258,55 +265,7 @@ void teaSelection() {
     if (nextButtonDebouncer.fell()) {
       // Call the progAdjust function when the nextButton is pressed
       progAdjust();
-      return;  // exit the teaSelection function
-    }
-
-    // Delay to avoid rapid changes due to noise
-    delay(generalDelay);
-  }
-}
-
-void selectCupSize() {
-  // Clear the LCD display
-  lcd.clear();
-
-  // Display the cup size selection prompt on the first row
-  lcd.print("Select Cup Size");
-
-  // Display the current cup size on the second row
-  lcd.setCursor(0, 1);
-  lcd.print("Small   Large");
-
-  // Rotary encoder variables
-  int encoderValue = 0;
-  int encoderLastValue = 0;
-
-  // While the nextButton is not pressed, allow the user to scroll through cup size options
-  while (nextButtonDebouncer.read() == HIGH) {
-    // Update encoder value based on the rotary input
-    encoderValue += (digitalRead(rotaryInput) == HIGH) - (digitalRead(rotaryInput) == LOW);
-
-    // Ensure the encoder value stays within valid bounds (0 for Small, 1 for Large)
-    encoderValue = constrain(encoderValue, 0, 1);
-
-    // If the encoder value changes, update the LCD display
-    if (encoderValue != encoderLastValue) {
-      lcd.setCursor(0, 1);
-      lcd.print(encoderValue == 0 ? ">Small   Large" : " Small   >Large");
-
-      // Update the last encoder value
-      encoderLastValue = encoderValue;
-    }
-
-    // Check and debounce nextButton
-    nextButtonDebouncer.update();
-
-    if (nextButtonDebouncer.fell()) {
-      // User made a selection, update the global variable
-      cupSizeSelection = encoderValue;
-
-      // Exit the function
-      return;
+      return;  // Exit the teaSelection function
     }
 
     // Delay to avoid rapid changes due to noise
@@ -316,12 +275,9 @@ void selectCupSize() {
 
 
 void progAdjust() {
+  Serial.println("progAdjust fucnction is running");
   // Allows the user to tweak or adjust teaTime variable by using the rotary encoder (rotaryInput)
   // to add or subtract time from teaTime variable in increments of 30 seconds (30000ms)
-  
-  // Rotary encoder variables
-  int encoderValue = 0;
-  int encoderLastValue = 0;
 
   // Debounce object for nextButton
   nextButtonDebouncer.update();
@@ -343,26 +299,77 @@ void progAdjust() {
     lcd.print(abs(adjustedTime) / 1000);
     lcd.print("s");
 
+    // Delay to avoid rapid changes due to noise
+    delay(generalDelay);
+
     // Check and debounce nextButton
     nextButtonDebouncer.update();
-
-    if (nextButtonDebouncer.fell()) {
-      // Exit the function if the nextButton is pressed
-      return;
-    }
 
     // Update selectedTeaTime if the encoder value changes
     if (encoderValue != encoderLastValue) {
       selectedTeaTime = adjustedTime;
       encoderLastValue = encoderValue;
     }
-
-    // Delay to avoid rapid changes due to noise
-    delay(generalDelay);
+	if (nextButtonDebouncer.fell()) {
+    // Exit the function if the nextButton is pressed
+    return;
+    }
   }
 }
 
+
+void selectCupSize() {
+  Serial.println("selectCupSize fucnction is running");
+  // Clear the LCD display
+  lcd.clear();
+
+  // Display the cup size selection prompt on the first row
+  lcd.print("Select Cup Size");
+
+  // Display the current cup size on the second row
+  lcd.setCursor(0, 1);
+  lcd.print("Small   Large");
+
+  // Rotary encoder variables
+  int encoderValue = 0;
+  int encoderLastValue = 0;
+
+  // While the nextButton is not pressed, allow the user to scroll through cup size options
+  while (nextButtonDebouncer.read() == HIGH) {
+    // Read changes from the selectorKnob
+    int selectorKnobChange = selectorKnob.read();
+
+    // Update selectorKnobValue based on the change
+    int selectorKnobValue = selectorKnobChange;
+
+    // Ensure the selectorKnob value stays within valid bounds (0 for Small, 1 for Large)
+    selectorKnobValue = constrain(selectorKnobValue, 0, 1);
+
+    // If the selectorKnob value changes, update the LCD display
+    if (selectorKnobChange != 0) {
+      lcd.setCursor(0, 1);
+      lcd.print(selectorKnobValue == 0 ? ">Small   Large" : " Small   >Large");
+
+      // Update the last encoder value
+      encoderLastValue = encoderValue;
+    }
+
+    // Check and debounce nextButton
+    nextButtonDebouncer.update();
+
+    if (nextButtonDebouncer.fell()) {
+      // User made a selection, update the global variable
+      cupSizeSelection = selectorKnobValue;
+
+      // Exit the function
+      return;
+    }
+  }
+}
+
+
 void preFlight() {
+  Serial.println("preFlight fucnction is running");
   // Check ultrasonic sensor to ensure a cup is placed for dispensing hot water into it
   if (digitalRead(cupPresence) == HIGH) {
     // Cup is not present
@@ -394,8 +401,8 @@ void preFlight() {
 }
 
 
-void pumpWater() {  // Function to pump water from the reservoir to the boiler
-
+void pumpWater() {  // Function to pump water from the cold reservoir to the boiler
+  Serial.println("pumpWater fucnction is running");
   digitalWrite(waterPump, HIGH); // Activate the water pump
 
   // Check which water fill probe to use based on cup size selection
@@ -419,6 +426,7 @@ void pumpWater() {  // Function to pump water from the reservoir to the boiler
 
 // Function to heat water in the boiler
 void heatWater() {
+  Serial.println("heatWater fucnction is running");
   digitalWrite(heatingCoil, HIGH); // Activate the heating coil
 
   // Wait for the heating coil to warm up (adjust as needed)
@@ -449,8 +457,6 @@ void heatWater() {
     // Delay to avoid rapid checking
     delay(generalDelay);
   }
-
-  lcd.clear();
 }
 
 
