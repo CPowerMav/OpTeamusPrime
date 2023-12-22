@@ -1,6 +1,6 @@
 // External includes
 #include <Servo.h> // Arduino default servo motor library
-#include <Stepper.h> // Arduino default stepper motor library
+#include <AccelStepper.h> // Arduino non-default stepper motor library with acceleration and deceleration methods
 #include <LiquidCrystal.h> // Arduino default LCD display library
 #include <Bounce2.h> // Button debouncing library
 #include <Encoder.h> // Rotary encoder library
@@ -46,28 +46,34 @@ const int waterFillMax = A3; // Water level probe inside boiler for max size
 
 // Define other constants
 const int STEPS_PER_REVOLUTION = 200; // Stepper value
-const int dispenseDuration = 5000;  // Adjust as needed
+const int dispenseDuration = 10000;  // Air pump avtivation time to dispense all hot water from boiler to cup (in milliseconds)
 const float Rref = 50000.0;  // Reference resistance
 const float nominal_temeprature = 25.0;  // Nominal temperature in Celsius
-const float nominal_resistance = 50000.0;  // Nominal resistance at nominal temperature
+const float nominal_resistance = 50000.0;  // Nominal resistance at nominal temperature (ohms)
 const float beta = 3950.0;  // Beta value of the NTC thermistor
 const int startupDelay = 2000; // Update this to adjust startup delay globally
-const int generalDelay = 50; // Update this to adjust delays for button inputs
-const int servoDelay = 1000; // Update this to adjust delays for servos to arrive to set positions
+const int generalDelay = 50; // Update this to adjust the general delay time for all functions
+const int servoDelay = 1000; // Update this to adjust delays for servos to arrive to set positions - Need to update this to watch servo location from servo.read
 const int steepTimeAdjustInterval = 30000; // Adjust steep time by this increment in +/- milliseconds
+const int referenceOffset = 10;  // Distance down from the limit switch to establish the reference position
+const int referenceOffset = 10;  // Distance down from the limit switch to establish the reference position
+const float ballscrewPitch = 2.0;  // Ballscrew pitch in mm per revolution
+const float pitchToDistance = 360.0 / ballscrewPitch;  // Conversion factor for stepper motor rotation to distance
+
 
 // Create Servo and Stepper objects
-Servo pivotServo;
-Servo grabberServo;
-Stepper elevatorRack(STEPS_PER_REVOLUTION, elevatorRackStep, elevatorRackDir);
+Servo pivotServo; // Create pivotServo object using Servo library class
+Servo grabberServo; // Create grabberServo object using Servo library class
+AccelStepper elevatorRack(AccelStepper::DRIVER, elevatorRackStep, elevatorRackDir); // Create AccelStepper object called "elevatorRack"
 
 // Word substitutions for pivotServo positions
+const int gearRatio = 3  // Gear ratio of pivotServo is 3:1
 
-const int NORTH = 180; // For pivotServo pointing straight up
-const int EAST = 90; // For pivotServo pointing to the right
-const int SOUTH = 0; // For pivotServo pointing straight down
-const int SEAST = 45; // For pivotServo down and right
-const int NEAST = 135; // For pivotServo up and right
+const int NORTH = round(180/gearRatio); // For pivotServo pointing straight up
+const int EAST = round(90/gearRatio); // For pivotServo pointing to the right
+const int SOUTH = 0; // For pivotServo pointing straight down - This is the expected initial position and index pivot arm to be pointing down
+const int SEAST = round(45/gearRatio); // For pivotServo down and right
+const int NEAST = round(135/gearRatio); // For pivotServo up and right
 
 // Word substitutions for grabberServo positions
 
@@ -133,8 +139,12 @@ void setup() {
   lcd.begin(16, 2); // Set up the LCD's number of columns and rows
   lcd.clear(); // Start by clearing the LCD
   lcd.print("OpTeaMus Prime"); // Print a message to the LCD.
-  grabberServo.attach(grabberServoPin);
-  pivotServo.attach(pivotServoPin);
+  grabberServo.attach(grabberServoPin);  // Attach the servo object to the correct pin
+  pivotServo.attach(pivotServoPin);  // Attach the servo object to the correct pin
+  elevatorRack.setMaxSpeed(1000);  // Set the maximum speed in steps per second
+  elevatorRack.setAcceleration(500);  // Set the acceleration in steps per second per second
+  elevatorRack.setDeceleration(500);  // Set the deceleration in steps per second per second
+
   // Initialize debouncers with the shared debounce interval
   loadButtonDebouncer.attach(loadButton, INPUT_PULLUP);
   loadButtonDebouncer.interval(debounceInterval);
@@ -151,7 +161,9 @@ void loop() {
   progAdjust();
   selectCupSize();
   preFlight();
+  pumpColdWater();
   heatWater();
+  pumpHotWater();
   steepFunction();
   disposeBag();
   shutDown();
@@ -170,22 +182,26 @@ void loop() {
 
 
 void startupInit() {
-  Serial.println("startupInit fucnction is running");
+  Serial.println("startupInit function is running");
+
   // Print messages to the LCD
   lcd.clear();
   lcd.print("OpTeaMus Prime");
   lcd.setCursor(0, 1);
   lcd.print("Getting ready..");
 
-  pivotServo.write(EAST); // Rotate grabber to EAST
-  delay(servoDelay); // Wait a second for it to arrive
-  
+  pivotServo.write(EAST);  // Rotate grabber to EAST
+  delay(servoDelay);       // Wait a second for it to arrive
+
   // Move gantry until the limit switch is triggered
   while (digitalRead(elevatorRackLimitSwitch) == HIGH) {
-    elevatorRack.step(1);
+    elevatorRack.runSpeed();  // Use AccelStepper's runSpeed method
+	delay(generalDelay);
   }
-  elevatorRack.step(-10);  // After the limit switch is activated, move thee gantry down again a bit. Adjust as needed.
-  pivotServo.write(SOUTH); // Now that the the elevator is at the top position, rotate grabber to SOUTH
+  elevatorRack.move(-referenceOffset);  // Move down to establish the reference position
+  elevatorRack.runToPosition();  // Wait for the move to complete
+
+  pivotServo.write(SOUTH);  // Now that the elevator is at the top position, rotate grabber to SOUTH
 }
 
 void loadGrabber() {
@@ -401,8 +417,8 @@ void preFlight() {
 }
 
 
-void pumpWater() {  // Function to pump water from the cold reservoir to the boiler
-  Serial.println("pumpWater fucnction is running");
+void pumpColdWater() {  // Function to pump water from the cold reservoir to the boiler
+  Serial.println("pumpColdWater fucnction is running");
   digitalWrite(waterPump, HIGH); // Activate the water pump
 
   // Check which water fill probe to use based on cup size selection
@@ -424,8 +440,7 @@ void pumpWater() {  // Function to pump water from the cold reservoir to the boi
 }
 
 
-// Function to heat water in the boiler
-void heatWater() {
+void heatWater() { // Function to heat water in the boiler
   Serial.println("heatWater fucnction is running");
   digitalWrite(heatingCoil, HIGH); // Activate the heating coil
 
@@ -444,26 +459,71 @@ void heatWater() {
     lcd.print(temperatureCelsius);
     lcd.print(" C   ");
 
-    // Check if the current temperature is below the target temperature
-    if (temperatureCelsius < selectedTeaTemp) {
-      // Continue heating
-      // You may need to adjust the heating process based on your system characteristics
-    } else {
-      // Stop heating
-      digitalWrite(heatingCoil, LOW);
+    if (temperatureCelsius >= selectedTeaTemp) {  // Continuously check if the current temperature is below the target temperature, otherwise, turn off heatingCoil
+      digitalWrite(heatingCoil, LOW);  // Turn off the heatingCoil because selectedTeaTemp has been reached
       break;
     }
-
-    // Delay to avoid rapid checking
-    delay(generalDelay);
+    delay(generalDelay);  // Delay to avoid rapid checking
   }
 }
 
 
+void pumpHotWater() {
+  Serial.println("heatWater fucnction is running");
+  unsigned long startTime = millis();
+
+  while (millis() - startTime < dispenseDuration) {
+    digitalWrite(airPump, HIGH);
+  }
+
+  digitalWrite(airPump, LOW);
+}
+
+
 void steepFunction() {
-  // Code for steeping the tea bag
-  // Lower tea bag, countdown, raise tea bag
-  // Move on to next function automatically
+  Serial.println("steepFunction is running");
+
+  // Lower the Stepper "elevatorRack" 150mm down into the cup
+  int lowerDistance = 150;  // Distance to move down in mm
+  int lowerSteps = lowerDistance * pitchToDistance;  // Convert distance to steps
+  elevatorRack.move(lowerSteps);
+  elevatorRack.runToPosition();  // Wait for the move to complete
+
+  // Show a countdown on the LCD display as the tea is being steeped
+  lcd.clear();
+  lcd.print("Steeping...");
+
+  // Variables for periodic movement
+  int dunkDistance = 20;  // Distance to move up and down during dunking in mm
+  int dunkSteps = dunkDistance * pitchToDistance;  // Convert distance to steps
+  unsigned long startTime = millis();
+  int dunkInterval = 20000;  // Dunking interval in milliseconds (20 seconds)
+
+  for (int seconds = selectedTeaTime / 1000; seconds >= 0; seconds--) {
+    lcd.setCursor(0, 1);
+    lcd.print("Time left: ");
+    lcd.print(seconds);
+    lcd.print("s  ");
+
+    // Check if it's time to perform a dunk
+    if (millis() - startTime >= dunkInterval) {
+      // Move up for dunking
+      elevatorRack.move(dunkSteps);
+      elevatorRack.runToPosition();  // Wait for the move to complete
+
+      // Move down for dunking
+      elevatorRack.move(-dunkSteps);
+      elevatorRack.runToPosition();  // Wait for the move to complete
+
+      startTime = millis();  // Reset the timer for the next dunk
+    }
+
+    delay(1000);  // Update every second
+  }
+
+  // Raise the elevatorRack back up to its starting position
+  elevatorRack.move(referenceOffset);  // Move up by the reference offset
+  elevatorRack.runToPosition();  // Wait for the move to complete
 }
 
 void disposeBag() {
