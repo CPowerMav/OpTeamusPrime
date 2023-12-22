@@ -66,7 +66,7 @@ Servo grabberServo; // Create grabberServo object using Servo library class
 AccelStepper elevatorRack(AccelStepper::DRIVER, elevatorRackStep, elevatorRackDir); // Create AccelStepper object called "elevatorRack"
 
 // Word substitutions for pivotServo positions
-const int gearRatio = 3  // Gear ratio of pivotServo is 3:1
+const int gearRatio = 3;  // Gear ratio of pivotServo is 3:1
 
 const int NORTH = round(180/gearRatio); // For pivotServo pointing straight up
 const int EAST = round(90/gearRatio); // For pivotServo pointing to the right
@@ -142,7 +142,6 @@ void setup() {
   pivotServo.attach(pivotServoPin);  // Attach the servo object to the correct pin
   elevatorRack.setMaxSpeed(1000);  // Set the maximum speed in steps per second
   elevatorRack.setAcceleration(500);  // Set the acceleration in steps per second per second
-  elevatorRack.setDeceleration(500);  // Set the deceleration in steps per second per second
 
   // Initialize debouncers with the shared debounce interval
   loadButtonDebouncer.attach(loadButton, INPUT_PULLUP);
@@ -290,45 +289,56 @@ void teaSelection() {
 
 
 void progAdjust() {
-  Serial.println("progAdjust fucnction is running");
+  Serial.println("progAdjust function is running");
   // Allows the user to tweak or adjust teaTime variable by using the rotary encoder (rotaryInput)
   // to add or subtract time from teaTime variable in increments of 30 seconds (30000ms)
 
-  // Debounce object for nextButton
-  nextButtonDebouncer.update();
-
-  // Display "Adjust steep" on the first line
+  // Clear the LCD display
   lcd.clear();
   lcd.print("Adjust steep");
 
+  // Initialize the encoder value and last value
+  int encoderValue = 0;
+  int encoderLastValue = 0;
+
+  // While the nextButton is not pressed, allow the user to adjust the steep time
   while (nextButtonDebouncer.read() == HIGH) {
-    // Update encoder value based on the rotary input
-    encoderValue += (digitalRead(rotaryInput) == HIGH) - (digitalRead(rotaryInput) == LOW);
+    // Read changes from the selectorKnob
+    int selectorKnobChange = selectorKnob.read();
 
-    // Calculate adjusted steep time
-    int adjustedTime = selectedTeaTime + encoderValue * steepTimeAdjustInterval;
+    // Update selectorKnobValue based on the change
+    int selectorKnobValue = selectorKnobChange;
 
-    // Display plus or minus and the total time dynamically on the second line
-    lcd.setCursor(0, 1);
-    lcd.print(encoderValue > 0 ? "+" : "-");
-    lcd.print(abs(adjustedTime) / 1000);
-    lcd.print("s");
+    // Ensure the selectorKnob value stays within valid bounds
+    selectorKnobValue = constrain(selectorKnobValue, -1, 1);
 
-    // Delay to avoid rapid changes due to noise
-    delay(generalDelay);
+    // If the selectorKnob value changes, update the LCD display and encoder value
+    if (selectorKnobChange != 0) {
+      encoderValue += selectorKnobValue;
+
+      // Calculate adjusted steep time
+      int adjustedTime = selectedTeaTime + encoderValue * steepTimeAdjustInterval;
+
+      // Display plus or minus and the total time dynamically on the second line
+      lcd.setCursor(0, 1);
+      lcd.print(encoderValue > 0 ? "+" : "-");
+      lcd.print(abs(adjustedTime) / 1000);
+      lcd.print("s");
+
+      // Update the last encoder value
+      encoderLastValue = encoderValue;
+    }
 
     // Check and debounce nextButton
     nextButtonDebouncer.update();
 
-    // Update selectedTeaTime if the encoder value changes
-    if (encoderValue != encoderLastValue) {
-      selectedTeaTime = adjustedTime;
-      encoderLastValue = encoderValue;
-    }
-	if (nextButtonDebouncer.fell()) {
     // Exit the function if the nextButton is pressed
-    return;
+    if (nextButtonDebouncer.fell()) {
+      return;
     }
+
+    // Delay to avoid rapid changes due to noise
+    delay(generalDelay);
   }
 }
 
