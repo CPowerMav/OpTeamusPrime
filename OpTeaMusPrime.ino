@@ -17,7 +17,7 @@ const int elevatorRackDir = 7; // PWM Pin
 	// User Input
 const int loadButton = 22; // Pulled up and debounced in setup
 const int nextButton = 23; // Pulled up and debounced in setup
-const int rotaryButton = 24; // Rotary encoder SW pin
+const int rotaryButton = 24; // Rotary encoder SW pin - Currently unused
 const int rotaryA = 2; // DT Pin - Interrupt capable pin
 const int rotaryB = 3; // CLK Pin - Interrupt capable pin
 Encoder selectorKnob(rotaryA, rotaryB); // Create Encoder object for rotary encoder "Encoder" class called "selectorKnob".
@@ -44,13 +44,16 @@ const int waterReservoir = A1;  // Water level probes inside cold water reservoi
 const int waterFill = A2;  // Water level probe inside boiler for regular size
 const int waterFillMax = A3; // Water level probe inside boiler for max size
 
-// Define other constants
-const int STEPS_PER_REVOLUTION = 200; // Stepper value
-const int dispenseDuration = 10000;  // Air pump avtivation time to dispense all hot water from boiler to cup (in milliseconds)
+// NTC Thermistor constants
+// Thermistor red to 5v, black to junction of 5k resistor, junction to A0, 5k resistor to ground
 const float Rref = 50000.0;  // Reference resistance
 const float nominal_temeprature = 25.0;  // Nominal temperature in Celsius
 const float nominal_resistance = 50000.0;  // Nominal resistance at nominal temperature (ohms)
 const float beta = 3950.0;  // Beta value of the NTC thermistor
+
+// Define other constants
+const int STEPS_PER_REVOLUTION = 200; // Stepper value
+const int dispenseDuration = 10000;  // Air pump avtivation time to dispense all hot water from boiler to cup (in milliseconds)
 const int startupDelay = 2000; // Update this to adjust startup delay globally
 const int generalDelay = 50; // Update this to adjust the general delay time for all functions
 const int servoDelay = 1000; // Update this to adjust delays for servos to arrive to set positions - Need to update this to watch servo location from servo.read
@@ -582,4 +585,26 @@ APPENDIX:
 		LCD power consumption is 1.25mA
 	
 	
+*/
+
+
+
+/* Note for water sensor VD
+const int waterProbePin = A0;  // Analog input pin for water probe
+
+void setup() {
+  Serial.begin(9600);  // Initialize serial communication
+}
+
+void loop() {
+  // Read the analog value from the water probe
+  int waterValue = analogRead(waterProbePin);
+
+  // Print the analog reading to the Serial Monitor
+  //Serial.print("Analog Reading: ");
+  Serial.println(waterValue);
+
+  // Add a delay to control the rate of readings (adjust as needed)
+  delay(1000);
+}
 */
