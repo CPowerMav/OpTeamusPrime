@@ -588,20 +588,17 @@ void disposeBag() {
   lcd.setCursor(0, 1);
   lcd.print("Power off");
 
-delay(500000); // Long delay for now so it doesnt loop the functions
 // Wave goodbye?
 
 }
 
 
-/*
-
 void shutDown() {
+  delay(500000); // Long delay for now so it doesnt loop the functions
   // Code for shutting down the unit
   // Activate latching circuit
 }
 
-*/
 
 
 float calculateTemperature(int temperatureSensor) {
