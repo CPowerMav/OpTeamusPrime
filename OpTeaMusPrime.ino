@@ -4,6 +4,7 @@
 #include <LiquidCrystal.h> // Arduino default LCD display library
 #include <Bounce2.h> // Button debouncing library
 #include <Encoder.h> // Rotary encoder library
+#include <NewPing.h> // Ultrasonic sensor library
 
 
 // Define Digital IO pin numbers - Skip Pin 13 if possible
@@ -21,13 +22,12 @@ const int rotaryButton = 24; // Rotary encoder SW pin - Currently unused
 const int rotaryA = 2; // DT Pin - Interrupt capable pin
 const int rotaryB = 3; // CLK Pin - Interrupt capable pin
 Encoder selectorKnob(rotaryA, rotaryB); // Create Encoder object for rotary encoder "Encoder" class called "selectorKnob".
-Bounce loadButtonDebouncer = Bounce();
-Bounce nextButtonDebouncer = Bounce();
+Bounce loadButtonDebouncer = Bounce();  // Create bounce object for button
+Bounce nextButtonDebouncer = Bounce();  // Create bounce object for button
 
 	// Bool Inputs & Sensors
-const int cupPresence = 44;
-const int ultrasonicTrig = 45;
-const int ultrasonicEcho = 46;
+const int ultrasonicTrig = 45; // Ultrasonic sensor trigger pin
+const int ultrasonicEcho = 46; // Ultrasonic sensor echo pin
 const int elevatorRackLimitSwitch = 8; // Limit switch pulled high in setup
 
 	// Bool Outputs
@@ -67,6 +67,7 @@ const float pitchToDistance = 360.0 / ballscrewPitch;  // Conversion factor for 
 Servo pivotServo; // Create pivotServo object using Servo library class
 Servo grabberServo; // Create grabberServo object using Servo library class
 AccelStepper elevatorRack(AccelStepper::DRIVER, elevatorRackStep, elevatorRackDir); // Create AccelStepper object called "elevatorRack"
+NewPing sonar(ultrasonicTrig, ultrasonicEcho); // Create a NewPing object for ultrasonic sensor
 
 // Word substitutions for pivotServo positions
 const int gearRatio = 2;  // Gear ratio of pivotServo is 2:1
@@ -151,6 +152,10 @@ void setup() {
   loadButtonDebouncer.interval(debounceInterval);
   nextButtonDebouncer.attach(nextButton, INPUT_PULLUP);
   nextButtonDebouncer.interval(debounceInterval);
+  
+  pinMode(ultrasonicTrig, OUTPUT); // Sets the trigPin as an Output
+  pinMode(ultrasonicEcho, INPUT); // Sets the echoPin as an Input
+  
 }
 
 void loop() {
@@ -169,15 +174,6 @@ void loop() {
   disposeBag();
   shutDown();
 }
-
-
-
-
-
-
-// Main functions written below are called by main loop
-
-
 
 
 
@@ -397,24 +393,32 @@ void selectCupSize() {
 
 
 void preFlight() {
-  Serial.println("preFlight fucnction is running");
+  Serial.println("preFlight function is running");
+
   // Check ultrasonic sensor to ensure a cup is placed for dispensing hot water into it
-  if (digitalRead(cupPresence) == HIGH) {
-    // Cup is not present
+  int distance = sonar.ping_cm();
+
+  if (distance > 0 && distance <= 10) {
+    // Cup is present within 10cm
+    lcd.clear();
+    lcd.print("Cup Detected");
+    delay(1000); // Display the message for 1 second
+  } else {
+    // Cup is not present or out of range
     lcd.clear();
     lcd.print("Place a cup");
-    while(digitalRead(cupPresence) == HIGH); // Wait here until a cup is placed
+    while (sonar.ping_cm() > 10 || sonar.ping_cm() == 0); // Wait here until a cup is placed
   }
-  
+
   // Check boolean sensor to ensure the water reservoir has enough water to perform water heating/brewing/steeping
   if (digitalRead(waterReservoir) == LOW) {
     // Water reservoir is empty
     lcd.clear();
     lcd.print("Add water");
-    while(digitalRead(waterReservoir) == LOW); // Wait here until water is refilled
+    while (digitalRead(waterReservoir) == LOW); // Wait here until water is refilled
   }
-  
-  // Wait for next button to be pressed
+
+  // Wait for the next button to be pressed
   lcd.clear();
   lcd.print("Press Next");
   lcd.setCursor(0, 1); // Move cursor to the beginning of the second row
@@ -534,22 +538,71 @@ void steepFunction() {
   }
 
   // Raise the elevatorRack back up to its starting position
-  elevatorRack.move(referenceOffset);  // Move up by the reference offset
+  elevatorRack.move(referenceOffset);  // Return to home position (named referenceOffset)
   elevatorRack.runToPosition();  // Wait for the move to complete
 }
 
-
 void disposeBag() {
-  // Code for disposing of the tea bag
-  // Listen to ultrasonic sensor, move gantry, rotate arm, release grabber, move gantry
-  // Wait for next button press
+  // Print to LCD first row "please remove". Print to LCD second line "cup".
+  lcd.clear();
+  lcd.print("Please remove");
+  lcd.setCursor(0, 1);
+  lcd.print("cup");
+
+  // Wait 1 second (non-blocking delay)
+  delay(1000);
+
+  // Check ultrasonic sensor that the cup has indeed been removed and there is no object detected within 3 cm of sensor.
+  while (sonar.ping_cm() <= 3) {
+    // Wait here until the cup is removed
+    delay(generalDelay);
+  }
+
+  // Clear LCD and print "Resetting"
+  lcd.clear();
+  lcd.print("Resetting");
+
+  // Move elevatorRack down to 200mm position (down 200mm away from "referenceOffset" position).
+  elevatorRack.move(200 * pitchToDistance);
+  elevatorRack.runToPosition();
+
+  // Rotate grabber to SEAST position while the elevatorRack is moving down.
+  pivotServo.write(SEAST);
+
+  // Once elevatorRack and grabberArm reach their final positions, open the grabberServo (OPEN).
+  while (elevatorRack.isRunning()) {
+    delay(generalDelay);
+  }
+  grabberServo.write(OPEN);
+  delay(1000); // Wait for a second
+
+  // Move the elevatorRack back to "referenceOffset" position
+  elevatorRack.move(referenceOffset);
+  elevatorRack.runToPosition();
+
+  // Reset grabberArm to SOUTH.
+  pivotServo.write(SOUTH);
+  
+  lcd.clear();
+  lcd.print("Please");
+  lcd.setCursor(0, 1);
+  lcd.print("Power off");
+
+delay(500000); // Long delay for now so it doesnt loop the functions
+// Wave goodbye?
+
 }
 
+
+/*
 
 void shutDown() {
   // Code for shutting down the unit
   // Activate latching circuit
 }
+
+*/
+
 
 float calculateTemperature(int temperatureSensor) {
   float R = Rref * (1023.0 / (float)temperatureSensor - 1.0); // Calculate NTC resistance
