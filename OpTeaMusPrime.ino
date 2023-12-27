@@ -46,7 +46,7 @@ const int waterFillMax = A3; // Water level probe inside boiler for max size
 
 // NTC Thermistor constants
 // Thermistor red to 5v, black to junction of 5k resistor, junction to A0, 5k resistor to ground
-const float Rref = 50000.0;  // Reference resistance
+const float Rref = 5000.0;  // Reference resistance
 const float nominal_temeprature = 25.0;  // Nominal temperature in Celsius
 const float nominal_resistance = 50000.0;  // Nominal resistance at nominal temperature (ohms)
 const float beta = 3950.0;  // Beta value of the NTC thermistor
@@ -69,7 +69,7 @@ Servo grabberServo; // Create grabberServo object using Servo library class
 AccelStepper elevatorRack(AccelStepper::DRIVER, elevatorRackStep, elevatorRackDir); // Create AccelStepper object called "elevatorRack"
 
 // Word substitutions for pivotServo positions
-const int gearRatio = 3;  // Gear ratio of pivotServo is 3:1
+const int gearRatio = 2;  // Gear ratio of pivotServo is 2:1
 
 const int NORTH = round(180/gearRatio); // For pivotServo pointing straight up
 const int EAST = round(90/gearRatio); // For pivotServo pointing to the right
