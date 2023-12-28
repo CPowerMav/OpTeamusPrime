@@ -617,20 +617,20 @@ APPENDIX:
 
 		LCD Pins               Arduino Pins
 		---------------------------------------
-		LCD VCC ---------------> 5V
-		LCD GND ---------------> GND
-		LCD RS  ---------------> D30
-		LCD RW  ---------------> GND
-		LCD EN  ---------------> D31
-		LCD D4  ---------------> D32
-		LCD D5  ---------------> D33
-		LCD D6  ---------------> D34
-		LCD D7  ---------------> D35
-		LCD Vo  ---------------> Connect to Potentiometer (for contrast control)
-							  ---> 5V (Potentiometer)
-							  ---> GND (Potentiometer)
-		LCD Backlight Anode ---> 5V (with Resistor (220 ohm))
-		LCD Backlight Cathode-> GND
+		1.  LCD VCC ---------------> 5V
+		2.  LCD GND ---------------> GND
+		3.  LCD Vo  ---------------> Connect to 10k Potentiometer center (for contrast control)
+							    ---> 5V  (Potentiometer)
+							    ---> GND (Potentiometer)
+		4.  LCD RS  ---------------> D30
+		5.  LCD RW  ---------------> GND
+		6.  LCD EN  ---------------> D31
+		11. LCD D4  ---------------> D32
+		12. LCD D5  ---------------> D33
+		13. LCD D6  ---------------> D34
+		14. LCD D7  ---------------> D35
+		15. LCD Backlight Anode ---> 5V (with Resistor (220 ohm))
+		16. LCD Backlight Cathode-> GND
 
 		LCD power consumption is 1.25mA
 	
