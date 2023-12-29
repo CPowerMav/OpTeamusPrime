@@ -12,13 +12,11 @@
 	// Movement with PWM Pins
 const int pivotServoPin = 4; // PWM Pin
 const int grabberServoPin = 5; // PWM Pin
-const int elevatorRackStep = 6; // PWM Pin
-const int elevatorRackDir = 7; // PWM Pin
-
-const int rackPin1 = 6;
-const int rackPin2 = 7;
-const int rackPin3 = 8;
-const int rackPin4 = 9;
+const int rackPin1 = 6;  // PWM Pin
+const int rackPin2 = 7;  // PWM Pin
+const int rackPin3 = 8;  // PWM Pin
+const int rackPin4 = 9;  // PWM Pin
+const int elevatorRackLimitSwitch = 10; // Limit switch pulled high in setup
 
 	// User Input
 const int loadButton = 22; // Pulled up and debounced in setup
@@ -33,7 +31,6 @@ Bounce nextButtonDebouncer = Bounce();  // Create bounce object for button
 	// Bool Inputs & Sensors
 const int ultrasonicTrig = 45; // Ultrasonic sensor trigger pin
 const int ultrasonicEcho = 46; // Ultrasonic sensor echo pin
-const int elevatorRackLimitSwitch = 8; // Limit switch pulled high in setup
 
 	// Bool Outputs
 const int heatingCoil = 47;
@@ -149,8 +146,8 @@ void setup() {
   lcd.print("OpTeaMus Prime"); // Print a message to the LCD.
   grabberServo.attach(grabberServoPin);  // Attach the servo object to the correct pin
   pivotServo.attach(pivotServoPin);  // Attach the servo object to the correct pin
-  elevatorRack.setMaxSpeed(1000);  // Set the maximum speed in steps per second
-  elevatorRack.setAcceleration(500);  // Set the acceleration in steps per second per second
+  elevatorRack.setMaxSpeed(3500);  // Set the maximum speed in steps per second
+  elevatorRack.setAcceleration(2000);  // Set the acceleration in steps per second per second
 
   // Initialize debouncers with the shared debounce interval
   loadButtonDebouncer.attach(loadButton, INPUT_PULLUP);
@@ -179,8 +176,6 @@ void loop() {
   disposeBag();
   shutDown();
 }
-
-
 
 
 void startupInit() {
@@ -490,7 +485,7 @@ void heatWater() { // Function to heat water in the boiler
 
 
 void pumpHotWater() {
-  Serial.println("heatWater fucnction is running");
+  Serial.println("pumpHotWater fucnction is running");
   unsigned long startTime = millis();
 
   while (millis() - startTime < dispenseDuration) {
@@ -520,10 +515,12 @@ void steepFunction() {
   unsigned long startTime = millis();
   int dunkInterval = 20000;  // Dunking interval in milliseconds (20 seconds)
 
-  for (int seconds = selectedTeaTime / 1000; seconds >= 0; seconds--) {
+  int secondsRemaining = selectedTeaTime / 1000;
+
+  while (secondsRemaining >= 0) {
     lcd.setCursor(0, 1);
     lcd.print("Time left: ");
-    lcd.print(seconds);
+    lcd.print(secondsRemaining);
     lcd.print("s  ");
 
     // Check if it's time to perform a dunk
@@ -539,13 +536,20 @@ void steepFunction() {
       startTime = millis();  // Reset the timer for the next dunk
     }
 
-    delay(1000);  // Update every second
+    // Update time remaining every second
+    if (millis() % 1000 == 0) {
+      secondsRemaining--;
+    }
+
+    // Add a small delay to avoid rapid checking
+    delay(generalDelay);
   }
 
   // Raise the elevatorRack back up to its starting position
   elevatorRack.move(referenceOffset);  // Return to home position (named referenceOffset)
   elevatorRack.runToPosition();  // Wait for the move to complete
 }
+
 
 void disposeBag() {
   // Print to LCD first row "please remove". Print to LCD second line "cup".
