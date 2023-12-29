@@ -15,6 +15,11 @@ const int grabberServoPin = 5; // PWM Pin
 const int elevatorRackStep = 6; // PWM Pin
 const int elevatorRackDir = 7; // PWM Pin
 
+const int rackPin1 = 6;
+const int rackPin2 = 7;
+const int rackPin3 = 8;
+const int rackPin4 = 9;
+
 	// User Input
 const int loadButton = 22; // Pulled up and debounced in setup
 const int nextButton = 23; // Pulled up and debounced in setup
@@ -66,7 +71,7 @@ const float pitchToDistance = 360.0 / ballscrewPitch;  // Conversion factor for 
 // Create Servo and Stepper objects
 Servo pivotServo; // Create pivotServo object using Servo library class
 Servo grabberServo; // Create grabberServo object using Servo library class
-AccelStepper elevatorRack(AccelStepper::DRIVER, elevatorRackStep, elevatorRackDir); // Create AccelStepper object called "elevatorRack"
+AccelStepper elevatorRack(AccelStepper::FULL4WIRE, rackPin1, rackPin2, rackPin3, rackPin4); // Create AccelStepper object called "elevatorRack"
 NewPing sonar(ultrasonicTrig, ultrasonicEcho); // Create a NewPing object for ultrasonic sensor
 
 // Word substitutions for pivotServo positions
