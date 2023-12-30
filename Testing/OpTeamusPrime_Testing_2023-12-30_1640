@@ -57,7 +57,7 @@ const float beta = 3950.0;  // Beta value of the NTC thermistor
 const int STEPS_PER_REVOLUTION = 200; // Stepper value
 const int dispenseDuration = 10000;  // Air pump avtivation time to dispense all hot water from boiler to cup (in milliseconds)
 const int startupDelay = 2000; // Update this to adjust startup delay globally
-const int generalDelay = 50; // Update this to adjust the general delay time for all functions
+const int generalDelay = 60; // Update this to adjust the general delay time for all functions
 const int servoDelay = 1000; // Update this to adjust delays for servos to arrive to set positions - Need to update this to watch servo location from servo.read
 const int steepTimeAdjustInterval = 30000; // Adjust steep time by this increment in +/- milliseconds
 const int referenceOffset = 10;  // Distance down from the limit switch to establish the reference position
@@ -72,13 +72,12 @@ AccelStepper elevatorRack(AccelStepper::FULL4WIRE, rackPin1, rackPin2, rackPin3,
 NewPing sonar(ultrasonicTrig, ultrasonicEcho); // Create a NewPing object for ultrasonic sensor
 
 // Word substitutions for pivotServo positions
-const int gearRatio = 2;  // Gear ratio of pivotServo is 2:1
 
-const int NORTH = round(180/gearRatio); // For pivotServo pointing straight up
-const int EAST = round(90/gearRatio); // For pivotServo pointing to the right
-const int SOUTH = 0; // For pivotServo pointing straight down - This is the expected initial position and index pivot arm to be pointing down
-const int SEAST = round(45/gearRatio); // For pivotServo down and right
-const int NEAST = round(135/gearRatio); // For pivotServo up and right
+const int NORTH = 33; // For pivotServo pointing straight up
+const int EAST = 75; // For pivotServo pointing to the right
+const int SOUTH = 120; // For pivotServo pointing straight down - This is the expected initial position and index pivot arm to be pointing down
+const int SEAST = 98; // For pivotServo down and right
+const int NEAST = 56; // For pivotServo up and right
 
 // Word substitutions for grabberServo positions
 
@@ -146,8 +145,8 @@ void setup() {
   lcd.print("OpTeaMus Prime"); // Print a message to the LCD.
   grabberServo.attach(grabberServoPin);  // Attach the servo object to the correct pin
   pivotServo.attach(pivotServoPin);  // Attach the servo object to the correct pin
-  elevatorRack.setMaxSpeed(3500);  // Set the maximum speed in steps per second
-  elevatorRack.setAcceleration(2000);  // Set the acceleration in steps per second per second
+  elevatorRack.setMaxSpeed(3000);  // Set the maximum speed in steps per second
+  elevatorRack.setAcceleration(1000);  // Set the acceleration in steps per second per second
 
   // Initialize debouncers with the shared debounce interval
   loadButtonDebouncer.attach(loadButton, INPUT_PULLUP);
@@ -157,24 +156,35 @@ void setup() {
   
   pinMode(ultrasonicTrig, OUTPUT); // Sets the trigPin as an Output
   pinMode(ultrasonicEcho, INPUT); // Sets the echoPin as an Input
+
+  // Set initial states
+  digitalWrite(heatingCoil, HIGH); // Make sure all this is off to start
+  digitalWrite(airPump, HIGH); // Make sure all this is off to start
+  digitalWrite(waterPump, HIGH); // Make sure all this is off to start
   
 }
 
 void loop() {
 // Main loop calls functions declared below
+  delay(500);
+  grabberServo.write(180);
+  delay(1000);
+  grabberServo.write(60);
+  delay(500);
   Serial.println("The main loop function is starting");
-  startupInit();
-  loadGrabber();
-  teaSelection();
-  progAdjust();
-  selectCupSize();
-  preFlight();
-  pumpColdWater();
-  heatWater();
-  pumpHotWater();
-  steepFunction();
-  disposeBag();
-  shutDown();
+//  startupInit();
+//  loadGrabber();
+ // delay(200000);
+ // teaSelection();
+ // progAdjust();
+ // selectCupSize();
+ // preFlight();
+ // pumpColdWater();
+ // heatWater();
+ // pumpHotWater();
+ // steepFunction();
+ // disposeBag();
+ // shutDown();
 }
 
 
@@ -190,16 +200,30 @@ void startupInit() {
   pivotServo.write(EAST);  // Rotate grabber to EAST
   delay(servoDelay);       // Wait a second for it to arrive
 
+  // Set a positive speed to move in one direction
+  elevatorRack.setSpeed(-8000);  // Adjust the speed value as needed
+
   // Move gantry until the limit switch is triggered
   while (digitalRead(elevatorRackLimitSwitch) == HIGH) {
+    Serial.println("Limit switch not triggered yet...");
     elevatorRack.runSpeed();  // Use AccelStepper's runSpeed method
-	delay(generalDelay);
+    delay(1);
   }
-  elevatorRack.move(-referenceOffset);  // Move down to establish the reference position
+  Serial.println("Limit switch triggered!");
+
+  // Stop the motor after the limit switch is triggered
+  elevatorRack.setSpeed(0);
+  elevatorRack.runSpeed();  // This is important to actually stop the motor
+
+  // Move down to establish the reference position
+  elevatorRack.move(+referenceOffset);
   elevatorRack.runToPosition();  // Wait for the move to complete
 
   pivotServo.write(SOUTH);  // Now that the elevator is at the top position, rotate grabber to SOUTH
 }
+
+
+
 
 void loadGrabber() {
   Serial.println("loadGrabber fucnction is running");
@@ -229,6 +253,7 @@ void loadGrabber() {
   }
 }
 
+/*
 
 void teaSelection() {
   Serial.println("teaSelection fucnction is running");
@@ -435,7 +460,7 @@ void preFlight() {
 
 void pumpColdWater() {  // Function to pump water from the cold reservoir to the boiler
   Serial.println("pumpColdWater fucnction is running");
-  digitalWrite(waterPump, HIGH); // Activate the water pump
+  digitalWrite(waterPump, LOW); // Activate the water pump
 
   // Check which water fill probe to use based on cup size selection
   int waterFillProbe;
@@ -452,13 +477,13 @@ void pumpColdWater() {  // Function to pump water from the cold reservoir to the
     delay(generalDelay);
   }
 
-  digitalWrite(waterPump, LOW); // Stop the water pump
+  digitalWrite(waterPump, HIGH); // Stop the water pump
 }
 
 
 void heatWater() { // Function to heat water in the boiler
   Serial.println("heatWater fucnction is running");
-  digitalWrite(heatingCoil, HIGH); // Activate the heating coil
+  digitalWrite(heatingCoil, LOW); // Activate the heating coil
 
   // Wait for the heating coil to warm up (adjust as needed)
   delay(startupDelay);
@@ -476,7 +501,7 @@ void heatWater() { // Function to heat water in the boiler
     lcd.print(" C   ");
 
     if (temperatureCelsius >= selectedTeaTemp) {  // Continuously check if the current temperature is below the target temperature, otherwise, turn off heatingCoil
-      digitalWrite(heatingCoil, LOW);  // Turn off the heatingCoil because selectedTeaTemp has been reached
+      digitalWrite(heatingCoil, HIGH);  // Turn off the heatingCoil because selectedTeaTemp has been reached
       break;
     }
     delay(generalDelay);  // Delay to avoid rapid checking
@@ -616,7 +641,7 @@ float calculateTemperature(int temperatureSensor) {
   T -= 273.15; // convert absolute temp to C
   return T;
 }
-
+*/
 
 /*
 
@@ -668,25 +693,21 @@ void loop() {
 }
 */
 
-
 /*
-
-Grabber pivotServo test calibration
-
+Grabber servo rotation arm degree calibration
   pivotServo.write(120);  // South grabber facing down
   Serial.println("We're pointing South.");
-  delay(2000);
+  delay(1000);
   pivotServo.write(98);  // SouthEast
   Serial.println("We're pointing SouthEast.");
-  delay(2000);
+  delay(1000);
   pivotServo.write(75);  // East
   Serial.println("We're pointing East.");
-  delay(2000);
+  delay(1000);
   pivotServo.write(56);  // NorthEast
   Serial.println("We're pointing NorthEast.");
-  delay(2000);
+  delay(1000);
   pivotServo.write(33);  // North
   Serial.println("We're pointing North.");
-  delay(6000);
-  
-*/
+  delay(5000);
+  */
