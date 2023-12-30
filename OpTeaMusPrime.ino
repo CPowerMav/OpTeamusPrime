@@ -20,8 +20,6 @@ const int rotaryButton = 24; // Rotary encoder SW pin - Currently unused
 const int rotaryA = 2; // DT Pin - Interrupt capable pin
 const int rotaryB = 3; // CLK Pin - Interrupt capable pin
 Encoder selectorKnob(rotaryA, rotaryB); // Create Encoder object for rotary encoder "Encoder" class called "selectorKnob".
-Bounce loadButtonDebouncer = Bounce();  // Create bounce object for button
-Bounce nextButtonDebouncer = Bounce();  // Create bounce object for button
 
 	// Bool Inputs & Sensors
 const int ultrasonicTrig = 45; // Ultrasonic sensor trigger pin
@@ -59,14 +57,9 @@ const int steepTimeAdjustInterval = 30000; // Adjust steep time by this incremen
 // Create Servo and Stepper objects
 Servo pivotServo; // Create pivotServo object using Servo library class
 Servo grabberServo; // Create grabberServo object using Servo library class
-AccelStepper elevatorRack(AccelStepper::FULL4WIRE, rackPin1, rackPin2, rackPin3, rackPin4); // Create AccelStepper object called "elevatorRack"
+AccelStepper elevatorRack(AccelStepper::FULL4WIRE, 6, 7, 8, 9); // Create AccelStepper object called "elevatorRack"
 NewPing sonar(ultrasonicTrig, ultrasonicEcho); // Create a NewPing object for ultrasonic sensor
 
-// Define elevatorRack parameters
-const int rackPin1 = 6;  // PWM Pin for motor controller digital input 1 - A
-const int rackPin2 = 7;  // PWM Pin for motor controller digital input 2 - A
-const int rackPin3 = 8;  // PWM Pin for motor controller digital input 3 - B
-const int rackPin4 = 9;  // PWM Pin for motor controller digital input 4 - B
 const int elevatorRackLimitSwitch = 10; // Limit switch pulled high in setup
 const float ballscrewPitch = 2.0; // ballscrewPitch in millimeters
 const int stepsPerRevolution = 200; // Number of steps per full revolution
@@ -75,7 +68,6 @@ int calculateSteps(float distanceCm)
 {
   return static_cast<int>((distanceCm / ballscrewPitch) * stepsPerRevolution);
 }
-
 
 // Word substitutions for pivotServo positions
 
@@ -113,6 +105,8 @@ int selectedTeaTemp = teaParams[currentTeaIndex].temp;
 char selectedTeaName[15];
 const int debounceInterval = 10; // Button debounce interval in milliseconds
 int cupSizeSelection = 0;  // Variable to store whcih size the user selects (0 is small, 1 is large)
+Bounce loadButtonDebouncer = Bounce();  // Create bounce object for button
+Bounce nextButtonDebouncer = Bounce();  // Create bounce object for button
 
 
 
@@ -149,7 +143,7 @@ void setup() {
 
   grabberServo.attach(grabberServoPin);
   pivotServo.attach(pivotServoPin);
-  elevatorRack.setMaxSpeed(1200);
+  elevatorRack.setMaxSpeed(800);
   elevatorRack.setAcceleration(500);
 
   loadButtonDebouncer.attach(loadButton, INPUT_PULLUP);
@@ -172,7 +166,7 @@ void loop() {
   Serial.println("The main loop function is starting");
   startupInit();
   loadGrabber();
- // delay(200000);
+  delay(200000);
  // teaSelection();
  // progAdjust();
  // selectCupSize();
@@ -185,6 +179,17 @@ void loop() {
  // shutDown();
 }
 
+// Function to rotate the servo slowly to the specified position
+void rotateServoSlowly(Servo servo, int targetPosition) {
+  int currentPosition = servo.read();
+  int step = (targetPosition > currentPosition) ? 1 : -1;
+
+  while (currentPosition != targetPosition) {
+    currentPosition += step;
+    servo.writeMicroseconds(map(currentPosition, 0, 180, 1000, 2000));
+    delay(15);  // Adjust the delay for the desired rotation speed
+  }
+}
 
 void startupInit() {
   Serial.println("startupInit function is running");
@@ -195,11 +200,7 @@ void startupInit() {
   lcd.setCursor(0, 1);
   lcd.print("Getting ready..");
 
-  pivotServo.write(EAST);  // Rotate grabber to EAST
-  delay(servoDelay);       // Wait a second for it to arrive
-  
-  //elevatorRack.setMaxSpeed(800); // Enable these if specific speed is necessary
-  //elevatorRack.setAcceleration(500); // Enable these if specific speed is necessary
+  rotateServoSlowly(pivotServo, EAST);
 
   // Perform homing procedure
   Serial.println("Homing procedure started...");
@@ -222,9 +223,9 @@ void startupInit() {
   Serial.println("Homing procedure completed.");
   delay(2500);
 
-  pivotServo.write(SOUTH);  // Now that the elevator is at the top position, rotate grabber to SOUTH
-}
+  rotateServoSlowly(pivotServo, SOUTH); // Now that the elevator is at the top position, rotate grabber to SOUTH
 
+}
 
 
 
@@ -237,25 +238,25 @@ void loadGrabber() {
   lcd.print("Then next");
 
   grabberServo.write(CLOSE);  // Start by closing the grabber
-
+  
   while (digitalRead(nextButton) == HIGH) {
     // Update debouncer for loadButton
     loadButtonDebouncer.update();
 
     // Check debounced button state
     if (loadButtonDebouncer.fell()) {
-      // Load button pressed
-      grabberServo.write(OPEN);
-      // Add additional logic or code to handle the button press action
+        // Load button pressed
+        grabberServo.write(OPEN);
+        // Add additional logic or code to handle the button press action
     } else {
-      // Load button not pressed, keep the grabber closed
-      grabberServo.write(CLOSE);
-	  delay(generalDelay); // Wait for the servo to close and move on to teaSelection 
-	  break;  // Exit the loop if nextButton is pressed
+        // Load button not pressed, keep the grabber closed
+        grabberServo.write(CLOSE);
+        delay(generalDelay); // Wait for the servo to close and move on to teaSelection 
     }
   }
 }
 
+/*
 
 void teaSelection() {
   Serial.println("teaSelection fucnction is running");
@@ -635,7 +636,7 @@ void shutDown() {
   // Activate latching circuit
 }
 
-
+*/
 
 float calculateTemperature(int temperatureSensor) {
   float R = Rref * (1023.0 / (float)temperatureSensor - 1.0); // Calculate NTC resistance
