@@ -9,14 +9,9 @@
 
 // Define Digital IO pin numbers - Skip Pin 13 if possible
 
-	// Movement with PWM Pins
+	// Servo pins
 const int pivotServoPin = 4; // PWM Pin
 const int grabberServoPin = 5; // PWM Pin
-const int rackPin1 = 6;  // PWM Pin
-const int rackPin2 = 7;  // PWM Pin
-const int rackPin3 = 8;  // PWM Pin
-const int rackPin4 = 9;  // PWM Pin
-const int elevatorRackLimitSwitch = 10; // Limit switch pulled high in setup
 
 	// User Input
 const int loadButton = 22; // Pulled up and debounced in setup
@@ -54,15 +49,11 @@ const float nominal_resistance = 50000.0;  // Nominal resistance at nominal temp
 const float beta = 3950.0;  // Beta value of the NTC thermistor
 
 // Define other constants
-const int STEPS_PER_REVOLUTION = 200; // Stepper value
 const int dispenseDuration = 10000;  // Air pump avtivation time to dispense all hot water from boiler to cup (in milliseconds)
 const int startupDelay = 2000; // Update this to adjust startup delay globally
-const int generalDelay = 50; // Update this to adjust the general delay time for all functions
+const int generalDelay = 60; // Update this to adjust the general delay time for all functions
 const int servoDelay = 1000; // Update this to adjust delays for servos to arrive to set positions - Need to update this to watch servo location from servo.read
 const int steepTimeAdjustInterval = 30000; // Adjust steep time by this increment in +/- milliseconds
-const int referenceOffset = 10;  // Distance down from the limit switch to establish the reference position
-const float ballscrewPitch = 2.0;  // Ballscrew pitch in mm per revolution
-const float pitchToDistance = 360.0 / ballscrewPitch;  // Conversion factor for stepper motor rotation to distance
 
 
 // Create Servo and Stepper objects
@@ -71,14 +62,28 @@ Servo grabberServo; // Create grabberServo object using Servo library class
 AccelStepper elevatorRack(AccelStepper::FULL4WIRE, rackPin1, rackPin2, rackPin3, rackPin4); // Create AccelStepper object called "elevatorRack"
 NewPing sonar(ultrasonicTrig, ultrasonicEcho); // Create a NewPing object for ultrasonic sensor
 
-// Word substitutions for pivotServo positions
-const int gearRatio = 2;  // Gear ratio of pivotServo is 2:1
+// Define elevatorRack parameters
+const int rackPin1 = 6;  // PWM Pin for motor controller digital input 1 - A
+const int rackPin2 = 7;  // PWM Pin for motor controller digital input 2 - A
+const int rackPin3 = 8;  // PWM Pin for motor controller digital input 3 - B
+const int rackPin4 = 9;  // PWM Pin for motor controller digital input 4 - B
+const int elevatorRackLimitSwitch = 10; // Limit switch pulled high in setup
+const float ballscrewPitch = 2.0; // ballscrewPitch in millimeters
+const int stepsPerRevolution = 200; // Number of steps per full revolution
+// Calculate steps required for given distance
+int calculateSteps(float distanceCm)
+{
+  return static_cast<int>((distanceCm / ballscrewPitch) * stepsPerRevolution);
+}
 
-const int NORTH = round(180/gearRatio); // For pivotServo pointing straight up
-const int EAST = round(90/gearRatio); // For pivotServo pointing to the right
-const int SOUTH = 0; // For pivotServo pointing straight down - This is the expected initial position and index pivot arm to be pointing down
-const int SEAST = round(45/gearRatio); // For pivotServo down and right
-const int NEAST = round(135/gearRatio); // For pivotServo up and right
+
+// Word substitutions for pivotServo positions
+
+const int NORTH = 33; // For pivotServo pointing straight up
+const int EAST = 75; // For pivotServo pointing to the right
+const int SOUTH = 120; // For pivotServo pointing straight down - This is the expected initial position and index pivot arm to be pointing down
+const int SEAST = 98; // For pivotServo down and right
+const int NEAST = 56; // For pivotServo up and right
 
 // Word substitutions for grabberServo positions
 
@@ -130,51 +135,54 @@ int cupSizeSelection = 0;  // Variable to store whcih size the user selects (0 i
 
 
 
-
 void setup() {
-//Setup - Runs once
   Serial.begin(9600);
   Serial.println("Void setup is running");
-  
-// PinModes - Most are set by library used like Encoder automatically setting pins to pullup
-  pinMode(elevatorRackLimitSwitch, INPUT_PULLUP); // Remember, HIGH means open circuit because of Pullup
+
+  pinMode(elevatorRackLimitSwitch, INPUT_PULLUP);
   pinMode(heatingCoil, OUTPUT);
   pinMode(airPump, OUTPUT);
   pinMode(waterPump, OUTPUT);
-  lcd.begin(16, 2); // Set up the LCD's number of columns and rows
-  lcd.clear(); // Start by clearing the LCD
-  lcd.print("OpTeaMus Prime"); // Print a message to the LCD.
-  grabberServo.attach(grabberServoPin);  // Attach the servo object to the correct pin
-  pivotServo.attach(pivotServoPin);  // Attach the servo object to the correct pin
-  elevatorRack.setMaxSpeed(3500);  // Set the maximum speed in steps per second
-  elevatorRack.setAcceleration(2000);  // Set the acceleration in steps per second per second
+  lcd.begin(16, 2);
+  lcd.clear();
+  lcd.print("OpTeaMus Prime");
 
-  // Initialize debouncers with the shared debounce interval
+  grabberServo.attach(grabberServoPin);
+  pivotServo.attach(pivotServoPin);
+  elevatorRack.setMaxSpeed(1200);
+  elevatorRack.setAcceleration(500);
+
   loadButtonDebouncer.attach(loadButton, INPUT_PULLUP);
   loadButtonDebouncer.interval(debounceInterval);
   nextButtonDebouncer.attach(nextButton, INPUT_PULLUP);
   nextButtonDebouncer.interval(debounceInterval);
-  
-  pinMode(ultrasonicTrig, OUTPUT); // Sets the trigPin as an Output
-  pinMode(ultrasonicEcho, INPUT); // Sets the echoPin as an Input
-  
+
+  pinMode(ultrasonicTrig, OUTPUT);
+  pinMode(ultrasonicEcho, INPUT);
+
+  digitalWrite(heatingCoil, LOW); // SSR set to low until needed.
+  digitalWrite(airPump, HIGH);  // For some reason relay module has NO closed when low. So set to HIGH at setup. LOW to activate.
+  digitalWrite(waterPump, HIGH); // For some reason relay module has NO closed when low. So set to HIGH at setup. LOW to activate.
 }
+
+
 
 void loop() {
 // Main loop calls functions declared below
   Serial.println("The main loop function is starting");
   startupInit();
   loadGrabber();
-  teaSelection();
-  progAdjust();
-  selectCupSize();
-  preFlight();
-  pumpColdWater();
-  heatWater();
-  pumpHotWater();
-  steepFunction();
-  disposeBag();
-  shutDown();
+ // delay(200000);
+ // teaSelection();
+ // progAdjust();
+ // selectCupSize();
+ // preFlight();
+ // pumpColdWater();
+ // heatWater();
+ // pumpHotWater();
+ // steepFunction();
+ // disposeBag();
+ // shutDown();
 }
 
 
@@ -189,17 +197,36 @@ void startupInit() {
 
   pivotServo.write(EAST);  // Rotate grabber to EAST
   delay(servoDelay);       // Wait a second for it to arrive
+  
+  //elevatorRack.setMaxSpeed(800); // Enable these if specific speed is necessary
+  //elevatorRack.setAcceleration(500); // Enable these if specific speed is necessary
 
-  // Move gantry until the limit switch is triggered
+  // Perform homing procedure
+  Serial.println("Homing procedure started...");
+  
   while (digitalRead(elevatorRackLimitSwitch) == HIGH) {
-    elevatorRack.runSpeed();  // Use AccelStepper's runSpeed method
-	delay(generalDelay);
+    elevatorRack.moveTo(-6000); // Adjust the distance as needed
+    elevatorRack.run();
   }
-  elevatorRack.move(-referenceOffset);  // Move down to establish the reference position
-  elevatorRack.runToPosition();  // Wait for the move to complete
+
+  elevatorRack.stop();
+  elevatorRack.setCurrentPosition(0);
+
+  // Move away from the limit switch, 3cm
+  elevatorRack.moveTo(300);
+  while (elevatorRack.distanceToGo() != 0) {
+    elevatorRack.run();
+  }
+  elevatorRack.stop();
+  
+  Serial.println("Homing procedure completed.");
+  delay(2500);
 
   pivotServo.write(SOUTH);  // Now that the elevator is at the top position, rotate grabber to SOUTH
 }
+
+
+
 
 void loadGrabber() {
   Serial.println("loadGrabber fucnction is running");
@@ -435,7 +462,7 @@ void preFlight() {
 
 void pumpColdWater() {  // Function to pump water from the cold reservoir to the boiler
   Serial.println("pumpColdWater fucnction is running");
-  digitalWrite(waterPump, HIGH); // Activate the water pump
+  digitalWrite(waterPump, LOW); // Activate the water pump
 
   // Check which water fill probe to use based on cup size selection
   int waterFillProbe;
@@ -452,13 +479,13 @@ void pumpColdWater() {  // Function to pump water from the cold reservoir to the
     delay(generalDelay);
   }
 
-  digitalWrite(waterPump, LOW); // Stop the water pump
+  digitalWrite(waterPump, HIGH); // Stop the water pump
 }
 
 
 void heatWater() { // Function to heat water in the boiler
   Serial.println("heatWater fucnction is running");
-  digitalWrite(heatingCoil, HIGH); // Activate the heating coil
+  digitalWrite(heatingCoil, LOW); // Activate the heating coil
 
   // Wait for the heating coil to warm up (adjust as needed)
   delay(startupDelay);
@@ -476,7 +503,7 @@ void heatWater() { // Function to heat water in the boiler
     lcd.print(" C   ");
 
     if (temperatureCelsius >= selectedTeaTemp) {  // Continuously check if the current temperature is below the target temperature, otherwise, turn off heatingCoil
-      digitalWrite(heatingCoil, LOW);  // Turn off the heatingCoil because selectedTeaTemp has been reached
+      digitalWrite(heatingCoil, HIGH);  // Turn off the heatingCoil because selectedTeaTemp has been reached
       break;
     }
     delay(generalDelay);  // Delay to avoid rapid checking
@@ -668,25 +695,21 @@ void loop() {
 }
 */
 
-
 /*
-
-Grabber pivotServo test calibration
-
+Grabber servo rotation arm degree calibration
   pivotServo.write(120);  // South grabber facing down
   Serial.println("We're pointing South.");
-  delay(2000);
+  delay(1000);
   pivotServo.write(98);  // SouthEast
   Serial.println("We're pointing SouthEast.");
-  delay(2000);
+  delay(1000);
   pivotServo.write(75);  // East
   Serial.println("We're pointing East.");
-  delay(2000);
+  delay(1000);
   pivotServo.write(56);  // NorthEast
   Serial.println("We're pointing NorthEast.");
-  delay(2000);
+  delay(1000);
   pivotServo.write(33);  // North
   Serial.println("We're pointing North.");
-  delay(6000);
-  
-*/
+  delay(5000);
+  */

@@ -7,7 +7,7 @@
 #include <NewPing.h> // Ultrasonic sensor library
 
 
-// Define Digital IO pin numbers - Skip Pin 13 if possible
+// Define Digital IO pin numbers - Skip limitPin 13 if possible
 
 	// Movement with PWM Pins
 const int pivotServoPin = 4; // PWM Pin
