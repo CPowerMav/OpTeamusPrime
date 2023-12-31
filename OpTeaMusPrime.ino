@@ -49,7 +49,7 @@ const float beta = 3950.0;  // Beta value of the NTC thermistor
 // Define other constants
 const int dispenseDuration = 10000;  // Air pump avtivation time to dispense all hot water from boiler to cup (in milliseconds)
 const int startupDelay = 2000; // Update this to adjust startup delay globally
-const int generalDelay = 60; // Update this to adjust the general delay time for all functions
+const int generalDelay = 50; // Update this to adjust the general delay time for all functions
 const int servoDelay = 1000; // Update this to adjust delays for servos to arrive to set positions - Need to update this to watch servo location from servo.read
 const int steepTimeAdjustInterval = 30000; // Adjust steep time by this increment in +/- milliseconds
 
@@ -113,16 +113,11 @@ Bounce nextButtonDebouncer = Bounce();  // Create bounce object for button
 
 
 
-
-
 //					MAIN CODE STARTS HERE
 //			MAIN CODE STARTS HERE
 //	MAIN CODE STARTS HERE
 //			MAIN CODE STARTS HERE
 //					MAIN CODE STARTS HERE
-
-
-
 
 
 
@@ -171,17 +166,9 @@ void loop() {
   Serial.println("The main loop function is starting");
   startupInit();
   loadGrabber();
-
-  lcd.clear();
-  lcd.print("functions passed");
-  lcd.setCursor(0, 1);
-  lcd.print("dafug");
-
-  delay(200000);
- 
- // teaSelection();
- // progAdjust();
- // selectCupSize();
+  teaSelection();
+  progAdjust();
+  selectCupSize();
  // preFlight();
  // pumpColdWater();
  // heatWater();
@@ -211,7 +198,9 @@ void startupInit() {
   lcd.print("OpTeaMus Prime");
   lcd.setCursor(0, 1);
   lcd.print("Getting ready..");
-
+  delay(10);
+  int myTestLocation = pivotServo.read();
+  pivotServo.write (myTestLocation);
   rotateServoSlowly(pivotServo, EAST);
 
   // Perform homing procedure
@@ -248,7 +237,7 @@ void loadGrabber() {
   lcd.print("Hold load btn");
   lcd.setCursor(0, 1);
   lcd.print("Then next");
-
+  delay(10);
   grabberServo.write(CLOSE);  // Start by closing the grabber
   nextButtonDebouncer.update();
 
@@ -266,51 +255,58 @@ void loadGrabber() {
     }
     delay(20); // Avoid rapid checking
   }
+    delay(10);
 }
 
-
-/*
-
 void teaSelection() {
-  Serial.println("teaSelection fucnction is running");
-  // Clear the LCD display
+  Serial.println("teaSelection function is running");
   lcd.clear();
-
-  // Display the heading on the first row
   lcd.print("Select Tea");
-
+  
   // Display the current tea name on the second row
   lcd.setCursor(0, 1);
   lcd.print(teaParams[currentTeaIndex].name);
+  delay(10);
 
   // Set the selectedTeaName variable
   strcpy(selectedTeaName, teaParams[currentTeaIndex].name); // Copy the tea name to the selectedTeaName variable
 
+  int lastSelectorKnobValue = selectorKnob.read();
+  unsigned long lastChangeTime = millis();
+
   // While the nextButton is not pressed, allow the user to scroll through tea options
   while (nextButtonDebouncer.read() == HIGH) {
     // Read changes from the selectorKnob
-    int selectorKnobChange = selectorKnob.read();
+    int selectorKnobValue = selectorKnob.read();
 
-    // Update selectorKnobValue based on the change
-    int selectorKnobValue = selectorKnobChange;
+    // Check for a significant change and apply debouncing
+    if (selectorKnobValue != lastSelectorKnobValue) {
+      lastChangeTime = millis();
+      lastSelectorKnobValue = selectorKnobValue;
+    }
 
-    // Ensure the selectorKnob value stays within valid bounds
-    selectorKnobValue = constrain(selectorKnobValue, 0, sizeof(teaParams) / sizeof(teaParams[0]) - 1);
+    // If there is no change for a certain period, consider it a valid change
+    if (millis() - lastChangeTime > 50) {  // Adjust this value based on your needs
+      // Ensure the selectorKnob value stays within valid bounds
+      selectorKnobValue = constrain(selectorKnobValue, 0, sizeof(teaParams) / sizeof(teaParams[0]) - 1);
 
-    // If the selectorKnob value changes, update the selected tea and LCD display
-    if (selectorKnobChange != 0) {
-      currentTeaIndex = selectorKnobValue;
-      selectedTeaTime = teaParams[currentTeaIndex].time;
-      selectedTeaTemp = teaParams[currentTeaIndex].temp;
+      // If the selectorKnob value changes, update the selected tea and LCD display
+      if (selectorKnobValue != currentTeaIndex) {
+        currentTeaIndex = selectorKnobValue;
+        selectedTeaTime = teaParams[currentTeaIndex].time;
+        selectedTeaTemp = teaParams[currentTeaIndex].temp;
 
-      // Copy the tea name to the selectedTeaName variable
-      strcpy(selectedTeaName, teaParams[currentTeaIndex].name);
+        // Copy the tea name to the selectedTeaName variable
+        strcpy(selectedTeaName, teaParams[currentTeaIndex].name);
 
-      // Clear the LCD and display the updated information
-      lcd.clear();
-      lcd.print("Select Tea");
-      lcd.setCursor(0, 1);
-      lcd.print(selectedTeaName);
+        // Clear the LCD and display the updated information
+        delay(10);
+        lcd.clear();
+        lcd.print("Select Tea");
+        lcd.setCursor(0, 1);
+        lcd.print(selectedTeaName);
+        delay(10);
+      }
     }
 
     // Check and debounce nextButton
@@ -319,6 +315,7 @@ void teaSelection() {
     if (nextButtonDebouncer.fell()) {
       // Call the progAdjust function when the nextButton is pressed
       progAdjust();
+      delay(10);
       return;  // Exit the teaSelection function
     }
 
@@ -326,6 +323,7 @@ void teaSelection() {
     delay(generalDelay);
   }
 }
+
 
 
 void progAdjust() {
@@ -432,6 +430,7 @@ void selectCupSize() {
   }
 }
 
+/*
 
 void preFlight() {
   Serial.println("preFlight function is running");
