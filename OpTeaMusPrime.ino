@@ -138,14 +138,19 @@ void setup() {
   pinMode(airPump, OUTPUT);
   pinMode(waterPump, OUTPUT);
   lcd.begin(16, 2);
+  delay(10);
   lcd.clear();
+  delay(10);
   lcd.print("OpTeaMus Prime");
+  delay(10);
 
   grabberServo.attach(grabberServoPin);
   pivotServo.attach(pivotServoPin);
   elevatorRack.setMaxSpeed(800);
   elevatorRack.setAcceleration(500);
 
+  pinMode(loadButton, INPUT_PULLUP);
+  pinMode(nextButton, INPUT_PULLUP);
   loadButtonDebouncer.attach(loadButton, INPUT_PULLUP);
   loadButtonDebouncer.interval(debounceInterval);
   nextButtonDebouncer.attach(nextButton, INPUT_PULLUP);
@@ -166,7 +171,14 @@ void loop() {
   Serial.println("The main loop function is starting");
   startupInit();
   loadGrabber();
+
+  lcd.clear();
+  lcd.print("functions passed");
+  lcd.setCursor(0, 1);
+  lcd.print("dafug");
+
   delay(200000);
+ 
  // teaSelection();
  // progAdjust();
  // selectCupSize();
@@ -179,8 +191,8 @@ void loop() {
  // shutDown();
 }
 
-// Function to rotate the servo slowly to the specified position
 void rotateServoSlowly(Servo servo, int targetPosition) {
+  // Function to rotate the servo slowly to the specified position
   int currentPosition = servo.read();
   int step = (targetPosition > currentPosition) ? 1 : -1;
 
@@ -224,13 +236,13 @@ void startupInit() {
   delay(2500);
 
   rotateServoSlowly(pivotServo, SOUTH); // Now that the elevator is at the top position, rotate grabber to SOUTH
-
 }
 
 
 
 void loadGrabber() {
-  Serial.println("loadGrabber fucnction is running");
+  Serial.println("loadGrabber function is running");
+
   // Print instructions to the LCD
   lcd.clear();
   lcd.print("Hold load btn");
@@ -238,23 +250,24 @@ void loadGrabber() {
   lcd.print("Then next");
 
   grabberServo.write(CLOSE);  // Start by closing the grabber
-  
+  nextButtonDebouncer.update();
+
   while (digitalRead(nextButton) == HIGH) {
     // Update debouncer for loadButton
     loadButtonDebouncer.update();
-
+    nextButtonDebouncer.update();
     // Check debounced button state
     if (loadButtonDebouncer.fell()) {
-        // Load button pressed
-        grabberServo.write(OPEN);
-        // Add additional logic or code to handle the button press action
-    } else {
-        // Load button not pressed, keep the grabber closed
-        grabberServo.write(CLOSE);
-        delay(generalDelay); // Wait for the servo to close and move on to teaSelection 
+      // Load button pressed
+      grabberServo.write(OPEN);
+    } else if (loadButtonDebouncer.rose()) {
+      // Load button released
+      grabberServo.write(CLOSE);
     }
+    delay(20); // Avoid rapid checking
   }
 }
+
 
 /*
 
