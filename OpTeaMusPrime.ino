@@ -48,10 +48,12 @@ const float beta = 3950.0;  // Beta value of the NTC thermistor
 
 // Define other constants
 const int dispenseDuration = 10000;  // Air pump avtivation time to dispense all hot water from boiler to cup (in milliseconds)
-const int startupDelay = 2000; // Update this to adjust startup delay globally
 const int generalDelay = 50; // Update this to adjust the general delay time for all functions
-const int servoDelay = 1000; // Update this to adjust delays for servos to arrive to set positions - Need to update this to watch servo location from servo.read
+const int servoDelay = 15; // Update this to adjust the slow movement of servos
 const int steepTimeAdjustInterval = 30000; // Adjust steep time by this increment in +/- milliseconds
+const int shortWait = 100; // Some delay variables
+const int medWait = 1000; // Some delay variables
+const int longWait = 5000; // Some delay variables
 
 
 // Create Servo and Stepper objects
@@ -133,11 +135,11 @@ void setup() {
   pinMode(airPump, OUTPUT);
   pinMode(waterPump, OUTPUT);
   lcd.begin(16, 2);
-  delay(10);
+  delay(generalDelay);
   lcd.clear();
-  delay(10);
+  delay(generalDelay);
   lcd.print("OpTeaMus Prime");
-  delay(10);
+  delay(generalDelay);
 
   grabberServo.attach(grabberServoPin);
   pivotServo.attach(pivotServoPin);
@@ -167,14 +169,13 @@ void loop() {
   startupInit();
   loadGrabber();
   teaSelection();
-  progAdjust();
-  selectCupSize();
+ // progAdjust();
+ // selectCupSize();
  // preFlight();
  // pumpColdWater();
  // heatWater();
  // pumpHotWater();
  // steepFunction();
- // disposeBag();
  // shutDown();
 }
 
@@ -186,7 +187,7 @@ void rotateServoSlowly(Servo servo, int targetPosition) {
   while (currentPosition != targetPosition) {
     currentPosition += step;
     servo.writeMicroseconds(map(currentPosition, 0, 180, 1000, 2000));
-    delay(15);  // Adjust the delay for the desired rotation speed
+    delay(servoDelay);  // Adjust the delay for the desired rotation speed
   }
 }
 
@@ -198,13 +199,18 @@ void startupInit() {
   lcd.print("OpTeaMus Prime");
   lcd.setCursor(0, 1);
   lcd.print("Getting ready..");
-  delay(10);
-  int myTestLocation = pivotServo.read();
-  pivotServo.write (myTestLocation);
-  rotateServoSlowly(pivotServo, EAST);
-
+  delay(generalDelay);
+  //Trying to get initial rotation to be slower
+  for (int i = pivotServo.read(); i < SOUTH; i++) {
+    pivotServo.write(i);
+    delay(servoDelay);  // Adjust the delay for the desired movement speed
+  }
   // Perform homing procedure
   Serial.println("Homing procedure started...");
+  
+  lcd.clear();
+  lcd.print("Rack Indexing...");
+  delay(generalDelay);
   
   while (digitalRead(elevatorRackLimitSwitch) == HIGH) {
     elevatorRack.moveTo(-6000); // Adjust the distance as needed
@@ -213,6 +219,10 @@ void startupInit() {
 
   elevatorRack.stop();
   elevatorRack.setCurrentPosition(0);
+  lcd.clear();
+  lcd.print("Indexing Done.");
+
+  delay(shortWait);
 
   // Move away from the limit switch, 3cm
   elevatorRack.moveTo(300);
@@ -222,9 +232,18 @@ void startupInit() {
   elevatorRack.stop();
   
   Serial.println("Homing procedure completed.");
-  delay(2500);
+  delay(medWait);
 
   rotateServoSlowly(pivotServo, SOUTH); // Now that the elevator is at the top position, rotate grabber to SOUTH
+  
+  while (pivotServo.read() != SOUTH) {
+    lcd.clear();
+    lcd.print("Almost there...");
+    lcd.setCursor(0, 1);
+    lcd.print(pivotServo.read());
+    delay(generalDelay);
+  }
+
 }
 
 
@@ -237,7 +256,7 @@ void loadGrabber() {
   lcd.print("Hold load btn");
   lcd.setCursor(0, 1);
   lcd.print("Then next");
-  delay(10);
+  delay(generalDelay);
   grabberServo.write(CLOSE);  // Start by closing the grabber
   nextButtonDebouncer.update();
 
@@ -253,9 +272,9 @@ void loadGrabber() {
       // Load button released
       grabberServo.write(CLOSE);
     }
-    delay(20); // Avoid rapid checking
+    delay(generalDelay); // Avoid rapid checking
   }
-    delay(10);
+    delay(generalDelay);
 }
 
 void teaSelection() {
@@ -266,7 +285,7 @@ void teaSelection() {
   // Display the current tea name on the second row
   lcd.setCursor(0, 1);
   lcd.print(teaParams[currentTeaIndex].name);
-  delay(10);
+  delay(generalDelay);
 
   // Set the selectedTeaName variable
   strcpy(selectedTeaName, teaParams[currentTeaIndex].name); // Copy the tea name to the selectedTeaName variable
@@ -300,12 +319,11 @@ void teaSelection() {
         strcpy(selectedTeaName, teaParams[currentTeaIndex].name);
 
         // Clear the LCD and display the updated information
-        delay(10);
         lcd.clear();
         lcd.print("Select Tea");
         lcd.setCursor(0, 1);
         lcd.print(selectedTeaName);
-        delay(10);
+        delay(generalDelay);
       }
     }
 
@@ -315,7 +333,7 @@ void teaSelection() {
     if (nextButtonDebouncer.fell()) {
       // Call the progAdjust function when the nextButton is pressed
       progAdjust();
-      delay(10);
+      delay(generalDelay);
       return;  // Exit the teaSelection function
     }
 
@@ -442,7 +460,7 @@ void preFlight() {
     // Cup is present within 10cm
     lcd.clear();
     lcd.print("Cup Detected");
-    delay(1000); // Display the message for 1 second
+    delay(medWait); // Display the message for 1 second
   } else {
     // Cup is not present or out of range
     lcd.clear();
@@ -501,7 +519,7 @@ void heatWater() { // Function to heat water in the boiler
   digitalWrite(heatingCoil, LOW); // Activate the heating coil
 
   // Wait for the heating coil to warm up (adjust as needed)
-  delay(startupDelay);
+  delay(medWait);
 
   lcd.clear();
   lcd.print("Heating Water");
@@ -599,7 +617,7 @@ void disposeBag() {
   lcd.print("cup");
 
   // Wait 1 second (non-blocking delay)
-  delay(1000);
+  delay(medWait);
 
   // Check ultrasonic sensor that the cup has indeed been removed and there is no object detected within 3 cm of sensor.
   while (sonar.ping_cm() <= 3) {
@@ -623,7 +641,7 @@ void disposeBag() {
     delay(generalDelay);
   }
   grabberServo.write(OPEN);
-  delay(1000); // Wait for a second
+  delay(medWait); // Wait for a second
 
   // Move the elevatorRack back to "referenceOffset" position
   elevatorRack.move(referenceOffset);
@@ -641,14 +659,19 @@ void disposeBag() {
 
 }
 
+*/
 
 void shutDown() {
+  lcd.clear();
+  lcd.print("Please");
+  lcd.setCursor(0, 1);
+  lcd.print("Power off");
   delay(500000); // Long delay for now so it doesnt loop the functions
   // Code for shutting down the unit
   // Activate latching circuit
 }
 
-*/
+
 
 float calculateTemperature(int temperatureSensor) {
   float R = Rref * (1023.0 / (float)temperatureSensor - 1.0); // Calculate NTC resistance
