@@ -65,14 +65,13 @@ NewPing sonar(ultrasonicTrig, ultrasonicEcho); // Create a NewPing object for ul
 const int elevatorRackLimitSwitch = 10; // Limit switch pulled high in setup
 const float ballscrewPitch = 2.0; // ballscrewPitch in millimeters
 const int stepsPerRevolution = 200; // Number of steps per full revolution
-// Calculate steps required for given distance
-int calculateSteps(float distanceCm)
-{
-  return static_cast<int>((distanceCm / ballscrewPitch) * stepsPerRevolution);
+
+// Calculate steps required for given distance in centimeters (hence why x10)
+int calculateSteps(float distanceCm) {
+  return static_cast<int>((distanceCm * 10 / ballscrewPitch) * stepsPerRevolution);
 }
 
 // Word substitutions for pivotServo positions
-
 const int NORTH = 33; // For pivotServo pointing straight up
 const int EAST = 75; // For pivotServo pointing to the right
 const int SOUTH = 120; // For pivotServo pointing straight down - This is the expected initial position and index pivot arm to be pointing down
@@ -80,7 +79,6 @@ const int SEAST = 98; // For pivotServo down and right
 const int NEAST = 56; // For pivotServo up and right
 
 // Word substitutions for grabberServo positions
-
 const int CLOSE = 90; // Grabber servo closed position (90 deg)
 const int OPEN = 0; // Grabber servo open position (0 deg)
 
@@ -213,7 +211,7 @@ void startupInit() {
   delay(generalDelay);
   
   while (digitalRead(elevatorRackLimitSwitch) == HIGH) {
-    elevatorRack.moveTo(-6000); // Adjust the distance as needed
+    elevatorRack.moveTo(-12000); // Adjust the distance as needed  //-12000 steps is up (negative) 12cm
     elevatorRack.run();
   }
 
@@ -225,7 +223,7 @@ void startupInit() {
   delay(shortWait);
 
   // Move away from the limit switch, 3cm
-  elevatorRack.moveTo(300);
+  elevatorRack.moveTo(calculateSteps(3));  // Move down 3cm
   while (elevatorRack.distanceToGo() != 0) {
     elevatorRack.run();
   }
