@@ -17,9 +17,10 @@ const int grabberServoPin = 5; // PWM Pin
 const int loadButton = 22; // Pulled up and debounced in setup
 const int nextButton = 23; // Pulled up and debounced in setup
 const int rotaryButton = 24; // Rotary encoder SW pin - Currently unused
-const int rotaryA = 2; // DT Pin - Interrupt capable pin
-const int rotaryB = 3; // CLK Pin - Interrupt capable pin
+const int rotaryA = 23; // DT Pin - Interrupt capable pin
+const int rotaryB = 24; // CLK Pin - Interrupt capable pin
 Encoder selectorKnob(rotaryA, rotaryB); // Create Encoder object for rotary encoder "Encoder" class called "selectorKnob".
+const int encoderDebounceInterval = 5; // Adjust this debouncing for the encoderKnob as needed
 
 	// Bool Inputs & Sensors
 const int ultrasonicTrig = 45; // Ultrasonic sensor trigger pin
@@ -49,7 +50,7 @@ const float beta = 3950.0;  // Beta value of the NTC thermistor
 // Define other constants
 const int dispenseDuration = 10000;  // Air pump avtivation time to dispense all hot water from boiler to cup (in milliseconds)
 const int generalDelay = 50; // Update this to adjust the general delay time for all functions
-const int servoDelay = 15; // Update this to adjust the slow movement of servos
+const int servoDelay = 20; // Update this to adjust the slow movement of servos
 const int steepTimeAdjustInterval = 30000; // Adjust steep time by this increment in +/- milliseconds
 const int shortWait = 100; // Some delay variables
 const int medWait = 1000; // Some delay variables
@@ -63,8 +64,8 @@ AccelStepper elevatorRack(AccelStepper::FULL4WIRE, 6, 7, 8, 9); // Create AccelS
 NewPing sonar(ultrasonicTrig, ultrasonicEcho); // Create a NewPing object for ultrasonic sensor
 
 const int elevatorRackLimitSwitch = 10; // Limit switch pulled high in setup
-const float ballscrewPitch = 2.0; // ballscrewPitch in millimeters
-const int stepsPerRevolution = 200; // Number of steps per full revolution
+const float ballscrewPitch = 8.0; // ballscrewPitch in millimeters
+const float stepsPerRevolution = 200.0; // Number of steps per full revolution
 
 // Calculate steps required for given distance in centimeters (hence why x10)
 int calculateSteps(float distanceCm) {
@@ -72,11 +73,12 @@ int calculateSteps(float distanceCm) {
 }
 
 // Word substitutions for pivotServo positions
-const int NORTH = 33; // For pivotServo pointing straight up
-const int EAST = 75; // For pivotServo pointing to the right
-const int SOUTH = 120; // For pivotServo pointing straight down - This is the expected initial position and index pivot arm to be pointing down
-const int SEAST = 98; // For pivotServo down and right
-const int NEAST = 56; // For pivotServo up and right
+const int stupidOffset = -10; // pivotServo gets out of alignment. This is a stupid fix for that globally.
+const int NORTH = 33+stupidOffset; // For pivotServo pointing straight up
+const int EAST = 75+stupidOffset; // For pivotServo pointing to the right
+const int SOUTH = 120+stupidOffset; // For pivotServo pointing straight down - This is the expected initial position and index pivot arm to be pointing down
+const int SEAST = 98+stupidOffset; // For pivotServo down and right
+const int NEAST = 56+stupidOffset; // For pivotServo up and right
 
 // Word substitutions for grabberServo positions
 const int CLOSE = 90; // Grabber servo closed position (90 deg)
@@ -107,6 +109,8 @@ const int debounceInterval = 10; // Button debounce interval in milliseconds
 int cupSizeSelection = 0;  // Variable to store whcih size the user selects (0 is small, 1 is large)
 Bounce loadButtonDebouncer = Bounce();  // Create bounce object for button
 Bounce nextButtonDebouncer = Bounce();  // Create bounce object for button
+Bounce encoderDebouncer = Bounce();
+
 
 
 
@@ -157,6 +161,10 @@ void setup() {
   digitalWrite(heatingCoil, LOW); // SSR set to low until needed.
   digitalWrite(airPump, HIGH);  // For some reason relay module has NO closed when low. So set to HIGH at setup. LOW to activate.
   digitalWrite(waterPump, HIGH); // For some reason relay module has NO closed when low. So set to HIGH at setup. LOW to activate.
+
+  encoderDebouncer.attach(rotaryA);
+  encoderDebouncer.interval(encoderDebounceInterval);
+
 }
 
 
@@ -164,6 +172,8 @@ void setup() {
 void loop() {
 // Main loop calls functions declared below
   Serial.println("The main loop function is starting");
+  delay(generalDelay);
+  debugStartup();
   startupInit();
   loadGrabber();
   teaSelection();
@@ -175,6 +185,31 @@ void loop() {
  // pumpHotWater();
  // steepFunction();
  // shutDown();
+}
+
+void debugStartup() {
+  Serial.println("debugStartup is running!");
+  // Allows the user to tweak or adjust teaTime variable by using the rotary encoder (rotaryInput)
+  // to add or subtract time from teaTime variable in increments of 30 seconds (30000ms)
+
+  // Clear the LCD display
+  lcd.clear();
+  lcd.print("Press start");
+
+  // While the nextButton is not pressed, allow the user to adjust the steep time
+  while (nextButtonDebouncer.read() == HIGH) {
+
+    // Check and debounce nextButton
+    nextButtonDebouncer.update();
+
+    // Exit the function if the nextButton is pressed
+    if (nextButtonDebouncer.fell()) {
+      return;
+    }
+
+    // Delay to avoid rapid changes due to noise
+    delay(generalDelay);
+  }
 }
 
 void rotateServoSlowly(Servo servo, int targetPosition) {
@@ -205,6 +240,7 @@ void startupInit() {
   }
   // Perform homing procedure
   Serial.println("Homing procedure started...");
+  delay(shortWait);
   
   lcd.clear();
   lcd.print("Rack Indexing...");
@@ -222,8 +258,8 @@ void startupInit() {
 
   delay(shortWait);
 
-  // Move away from the limit switch, 3cm
-  elevatorRack.moveTo(calculateSteps(3));  // Move down 3cm
+  // Move away from the limit switch, 2cm
+  elevatorRack.moveTo(calculateSteps(2));  // Move down 2cm
   while (elevatorRack.distanceToGo() != 0) {
     elevatorRack.run();
   }
@@ -233,14 +269,6 @@ void startupInit() {
   delay(medWait);
 
   rotateServoSlowly(pivotServo, SOUTH); // Now that the elevator is at the top position, rotate grabber to SOUTH
-  
-  while (pivotServo.read() != SOUTH) {
-    lcd.clear();
-    lcd.print("Almost there...");
-    lcd.setCursor(0, 1);
-    lcd.print(pivotServo.read());
-    delay(generalDelay);
-  }
 
 }
 
@@ -279,7 +307,7 @@ void teaSelection() {
   Serial.println("teaSelection function is running");
   lcd.clear();
   lcd.print("Select Tea");
-  
+
   // Display the current tea name on the second row
   lcd.setCursor(0, 1);
   lcd.print(teaParams[currentTeaIndex].name);
@@ -291,10 +319,17 @@ void teaSelection() {
   int lastSelectorKnobValue = selectorKnob.read();
   unsigned long lastChangeTime = millis();
 
+  // Initialize encoder debouncer
+  encoderDebouncer.attach(rotaryA);
+  encoderDebouncer.interval(encoderDebounceInterval);
+
   // While the nextButton is not pressed, allow the user to scroll through tea options
   while (nextButtonDebouncer.read() == HIGH) {
     // Read changes from the selectorKnob
     int selectorKnobValue = selectorKnob.read();
+
+    // Update the debouncer for the encoder
+    encoderDebouncer.update();
 
     // Check for a significant change and apply debouncing
     if (selectorKnobValue != lastSelectorKnobValue) {
@@ -303,7 +338,7 @@ void teaSelection() {
     }
 
     // If there is no change for a certain period, consider it a valid change
-    if (millis() - lastChangeTime > 50) {  // Adjust this value based on your needs
+    if (millis() - lastChangeTime > 10) {  // Adjust this value based on your needs
       // Ensure the selectorKnob value stays within valid bounds
       selectorKnobValue = constrain(selectorKnobValue, 0, sizeof(teaParams) / sizeof(teaParams[0]) - 1);
 
@@ -321,7 +356,7 @@ void teaSelection() {
         lcd.print("Select Tea");
         lcd.setCursor(0, 1);
         lcd.print(selectedTeaName);
-        delay(generalDelay);
+        delay(10);
       }
     }
 
@@ -339,6 +374,7 @@ void teaSelection() {
     delay(generalDelay);
   }
 }
+
 
 
 
