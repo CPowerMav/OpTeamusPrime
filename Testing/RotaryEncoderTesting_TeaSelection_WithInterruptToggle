@@ -1,0 +1,59 @@
+void teaSelection() {
+  Serial.println("teaSelection function is running");
+  lcd.clear();
+  lcd.print("Select Tea");
+  lcd.setCursor(0, 1);
+  lcd.print(teaParams[currentTeaIndex].name);
+  delay(generalDelay);
+
+  int lastSelectorKnobValue = selectorKnob.read();
+  unsigned long lastChangeTime = millis();
+
+  encoderDebouncer.attach(rotaryA);
+  encoderDebouncer.interval(encoderDebounceInterval);
+
+  // Enable interrupts for rotary encoder
+  interrupts();
+
+  while (nextButtonDebouncer.read() == HIGH) {
+    int selectorKnobValue = selectorKnob.read();
+    encoderDebouncer.update();
+
+    if (selectorKnobValue != lastSelectorKnobValue) {
+      lastChangeTime = millis();
+      lastSelectorKnobValue = selectorKnobValue;
+    }
+
+    if (millis() - lastChangeTime > 10) {
+      selectorKnobValue = constrain(selectorKnobValue, 0, sizeof(teaParams) / sizeof(teaParams[0]) - 1);
+
+      if (selectorKnobValue != currentTeaIndex) {
+        // Code to handle encoder input (update tea selection, LCD display, etc.)
+        currentTeaIndex = selectorKnobValue;
+        selectedTeaTime = teaParams[currentTeaIndex].time;
+        selectedTeaTemp = teaParams[currentTeaIndex].temp;
+        strcpy(selectedTeaName, teaParams[currentTeaIndex].name);
+
+        lcd.clear();
+        lcd.print("Select Tea");
+        lcd.setCursor(0, 1);
+        lcd.print(selectedTeaName);
+        delay(10);
+      }
+    }
+
+    nextButtonDebouncer.update();
+
+    if (nextButtonDebouncer.fell()) {
+      // Code to handle nextButton press (if needed)
+      progAdjust();
+      delay(generalDelay);
+      return;
+    }
+
+    delay(generalDelay);
+  }
+
+  // Disable interrupts after handling encoder input
+  noInterrupts();
+}

@@ -17,8 +17,8 @@ const int grabberServoPin = 5; // PWM Pin
 const int loadButton = 22; // Pulled up and debounced in setup
 const int nextButton = 23; // Pulled up and debounced in setup
 const int rotaryButton = 24; // Rotary encoder SW pin - Currently unused
-const int rotaryA = 23; // DT Pin - Interrupt capable pin
-const int rotaryB = 24; // CLK Pin - Interrupt capable pin
+const int rotaryA = 23; // DT Pin - Interrupt capable pin - Previously Pin 2 (Interrupt pin)
+const int rotaryB = 24; // CLK Pin - Interrupt capable pin - Previously Pin 3 (Interrupt pin)
 Encoder selectorKnob(rotaryA, rotaryB); // Create Encoder object for rotary encoder "Encoder" class called "selectorKnob".
 const int encoderDebounceInterval = 5; // Adjust this debouncing for the encoderKnob as needed
 
