@@ -17,10 +17,9 @@ const int grabberServoPin = 5; // PWM Pin
 const int loadButton = 22; // Pulled up and debounced in setup
 const int nextButton = 23; // Pulled up and debounced in setup
 // const int rotaryButton = 24; // Rotary encoder SW pin - Currently unused
-const int rotaryA = 25; // DT Pin - Interrupt capable pin - Previously Pin 2 (Interrupt pin)
-const int rotaryB = 24; // CLK Pin - Interrupt capable pin - Previously Pin 3 (Interrupt pin)
+const int rotaryA = 2; // DT Pin - Interrupt capable pin - Previously Pin 2 (Interrupt pin)
+const int rotaryB = 3; // CLK Pin - Interrupt capable pin - Previously Pin 3 (Interrupt pin)
 Encoder selectorKnob(rotaryA, rotaryB); // Create Encoder object for rotary encoder "Encoder" class called "selectorKnob".
-const int encoderDebounceInterval = 5; // Adjust this debouncing for the encoderKnob as needed
 
 	// Bool Inputs & Sensors
 const int ultrasonicTrig = 45; // Ultrasonic sensor trigger pin
@@ -85,7 +84,7 @@ const int CLOSE = 90; // Grabber servo closed position (90 deg)
 const int OPEN = 0; // Grabber servo open position (0 deg)
 
 
-// Define Tea Types - External Include?
+// Define Tea Types
 struct teaRecipe {
   const char* name;
   unsigned long time;
@@ -100,16 +99,18 @@ teaRecipe teaParams[] = {
   {"Herbal Tea", 800000, 99},
 };
 
+int currentRecipeIndex = 0;
+
 // Define variables
 int currentTeaIndex = 0;
 unsigned long selectedTeaTime = teaParams[currentTeaIndex].time;
 int selectedTeaTemp = teaParams[currentTeaIndex].temp;
 char selectedTeaName[15];
-const int debounceInterval = 10; // Button debounce interval in milliseconds
+const int debounceInterval = 15; // Button debounce interval in milliseconds
 int cupSizeSelection = 0;  // Variable to store whcih size the user selects (0 is small, 1 is large)
 Bounce loadButtonDebouncer = Bounce();  // Create bounce object for button
 Bounce nextButtonDebouncer = Bounce();  // Create bounce object for button
-Bounce encoderDebouncer = Bounce();
+//Bounce encoderDebouncer = Bounce();
 
 
 
@@ -148,6 +149,9 @@ void setup() {
   elevatorRack.setMaxSpeed(800);
   elevatorRack.setAcceleration(500);
 
+  pinMode(rotaryA, INPUT_PULLUP);
+  pinMode(rotaryB, INPUT_PULLUP);
+
   pinMode(loadButton, INPUT_PULLUP);
   pinMode(nextButton, INPUT_PULLUP);
   loadButtonDebouncer.attach(loadButton, INPUT_PULLUP);
@@ -162,9 +166,6 @@ void setup() {
   digitalWrite(airPump, HIGH);  // For some reason relay module has NO closed when low. So set to HIGH at setup. LOW to activate.
   digitalWrite(waterPump, HIGH); // For some reason relay module has NO closed when low. So set to HIGH at setup. LOW to activate.
 
-  encoderDebouncer.attach(rotaryA);
-  encoderDebouncer.interval(encoderDebounceInterval);
-
 }
 
 
@@ -173,11 +174,11 @@ void loop() {
 // Main loop calls functions declared below
   Serial.println("The main loop function is starting");
   delay(generalDelay);
-  debugStartup();
-  startupInit();
-  loadGrabber();
+//  debugStartup();
+//  startupInit();
+//  loadGrabber();
   teaSelection();
- // progAdjust();
+  progAdjust();
  // selectCupSize();
  // preFlight();
  // pumpColdWater();
@@ -300,7 +301,7 @@ void loadGrabber() {
     }
     delay(generalDelay); // Avoid rapid checking
   }
-    delay(generalDelay);
+  delay(generalDelay);
 }
 
 void teaSelection() {
@@ -311,67 +312,39 @@ void teaSelection() {
   // Display the current tea name on the second row
   lcd.setCursor(0, 1);
   lcd.print(teaParams[currentTeaIndex].name);
-  delay(generalDelay);
 
-  // Set the selectedTeaName variable
-  strcpy(selectedTeaName, teaParams[currentTeaIndex].name); // Copy the tea name to the selectedTeaName variable
-
-  int lastSelectorKnobValue = selectorKnob.read();
-  unsigned long lastChangeTime = millis();
-
-  // Initialize encoder debouncer
-  encoderDebouncer.attach(rotaryA);
-  encoderDebouncer.interval(encoderDebounceInterval);
+  int lastEncoderValue = selectorKnob.read() / 2; // Divide by 2 to adjust for detent behavior
 
   // While the nextButton is not pressed, allow the user to scroll through tea options
   while (nextButtonDebouncer.read() == HIGH) {
-    // Read changes from the selectorKnob
-    int selectorKnobValue = selectorKnob.read();
+    // Read changes from the rotary encoder
+    int encoderValue = selectorKnob.read() / 2; // Divide by 2 to adjust for detent behavior
 
-    // Update the debouncer for the encoder
-    encoderDebouncer.update();
+    // If the encoder value changes, update the LCD display and selected tea
+    if (encoderValue != lastEncoderValue) {
+      currentTeaIndex += (encoderValue > lastEncoderValue) ? 1 : -1;
 
-    // Check for a significant change and apply debouncing
-    if (selectorKnobValue != lastSelectorKnobValue) {
-      lastChangeTime = millis();
-      lastSelectorKnobValue = selectorKnobValue;
-    }
-
-    // If there is no change for a certain period, consider it a valid change
-    if (millis() - lastChangeTime > 10) {  // Adjust this value based on your needs
-      // Ensure the selectorKnob value stays within valid bounds
-      selectorKnobValue = constrain(selectorKnobValue, 0, sizeof(teaParams) / sizeof(teaParams[0]) - 1);
-
-      // If the selectorKnob value changes, update the selected tea and LCD display
-      if (selectorKnobValue != currentTeaIndex) {
-        currentTeaIndex = selectorKnobValue;
-        selectedTeaTime = teaParams[currentTeaIndex].time;
-        selectedTeaTemp = teaParams[currentTeaIndex].temp;
-
-        // Copy the tea name to the selectedTeaName variable
-        strcpy(selectedTeaName, teaParams[currentTeaIndex].name);
-
-        // Clear the LCD and display the updated information
-        lcd.clear();
-        lcd.print("Select Tea");
-        lcd.setCursor(0, 1);
-        lcd.print(selectedTeaName);
-        delay(10);
+      // Wrap around to the first entry if reaching the end of the array
+      if (currentTeaIndex < 0) {
+        currentTeaIndex = sizeof(teaParams) / sizeof(teaParams[0]) - 1;
+      } else if (currentTeaIndex >= sizeof(teaParams) / sizeof(teaParams[0])) {
+        currentTeaIndex = 0;
       }
+
+      // Update the LCD display with the new tea name
+      lcd.clear();
+      lcd.print("Select Tea");
+      lcd.setCursor(0, 1);
+      lcd.print(teaParams[currentTeaIndex].name);
+
+      // Delay to avoid rapid changes due to noise
+      delay(generalDelay);
+
+      lastEncoderValue = encoderValue;
     }
 
     // Check and debounce nextButton
     nextButtonDebouncer.update();
-
-    if (nextButtonDebouncer.fell()) {
-      // Call the progAdjust function when the nextButton is pressed
-      progAdjust();
-      delay(generalDelay);
-      return;  // Exit the teaSelection function
-    }
-
-    // Delay to avoid rapid changes due to noise
-    delay(generalDelay);
   }
 }
 
