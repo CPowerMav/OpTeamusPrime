@@ -46,9 +46,17 @@ const float nominal_temeprature = 25.0;  // Nominal temperature in Celsius
 const float nominal_resistance = 50000.0;  // Nominal resistance at nominal temperature (ohms)
 const float beta = 3950.0;  // Beta value of the NTC thermistor
 
+// Calculate temp C from NTC Thermistor
+float calculateTemperature(int temperatureSensor) {
+  float R = Rref * (1023.0 / (float)temperatureSensor - 1.0); // Calculate NTC resistance
+  float T = 1.0 / (1.0 / (nominal_temeprature + 273.15) + log(R / nominal_resistance) / beta);
+  T -= 273.15; // convert absolute temp to C
+  return T;
+}
+
 // Define other constants
 const int dispenseDuration = 10000;  // Air pump avtivation time to dispense all hot water from boiler to cup (in milliseconds)
-const int generalDelay = 50; // Update this to adjust the general delay time for all functions
+const int generalDelay = 15; // Update this to adjust the general delay time for all functions
 const int servoDelay = 20; // Update this to adjust the slow movement of servos
 const int steepTimeAdjustInterval = 30000; // Adjust steep time by this increment in +/- milliseconds
 const int shortWait = 100; // Some delay variables
@@ -92,11 +100,11 @@ struct teaRecipe {
 };
 
 teaRecipe teaParams[] = {
-  {"White Tea", 270000, 79},
-  {"Green Tea", 240000, 79},
-  {"Black Tea", 210000, 91},
-  {"Oolong Tea", 210000, 91},
-  {"Herbal Tea", 800000, 99},
+  {"1", 270000, 79}, //White Tea
+  {"2", 240000, 79}, //Green Tea
+  {"3", 210000, 91}, //Black Tea
+  {"4", 210000, 91}, //Oolong Tea
+  {"5", 800000, 99}, //Herbal Tea
 };
 
 int currentRecipeIndex = 0;
@@ -173,7 +181,7 @@ void setup() {
 void loop() {
 // Main loop calls functions declared below
   Serial.println("The main loop function is starting");
-  delay(generalDelay);
+  delay(medWait);
 //  debugStartup();
 //  startupInit();
 //  loadGrabber();
@@ -274,7 +282,6 @@ void startupInit() {
 }
 
 
-
 void loadGrabber() {
   Serial.println("loadGrabber function is running");
 
@@ -304,6 +311,47 @@ void loadGrabber() {
   delay(generalDelay);
 }
 
+void teaSelection() {
+  Serial.println("teaSelection function is running");
+  lcd.clear();
+  lcd.print("Select Tea");
+
+  // Display the current tea name on the second row
+  lcd.setCursor(0, 1);
+  lcd.print(teaParams[currentTeaIndex].name);
+
+  // Initialize encoder variables
+  minValue = 0;
+  maxValue = sizeof(teaParams) / sizeof(teaParams[0]) - 1;
+
+  // Set the ISR callback function
+  encoderCallback = [](long value) {
+    currentTeaIndex = value;
+    lcd.clear();
+    lcd.print("Select Tea");
+    lcd.setCursor(0, 1);
+    lcd.print(teaParams[currentTeaIndex].name);
+    delay(generalDelay);
+  };
+
+  // Attach the ISR to the interrupt pins
+  attachInterrupt(digitalPinToInterrupt(rotaryA), encoderISR, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(rotaryB), encoderISR, CHANGE);
+
+  // Wait for the nextButton to be pressed
+  while (nextButtonDebouncer.read() == HIGH) {
+    nextButtonDebouncer.update();
+    delay(generalDelay);
+  }
+
+  // Detach the ISR from the interrupt pins
+  detachInterrupt(digitalPinToInterrupt(rotaryA));
+  detachInterrupt(digitalPinToInterrupt(rotaryB));
+}
+
+
+/*
+// Previous working tea selection function without interrupts
 void teaSelection() {
   Serial.println("teaSelection function is running");
   lcd.clear();
@@ -348,7 +396,7 @@ void teaSelection() {
   }
 }
 
-
+*/
 
 
 void progAdjust() {
@@ -678,14 +726,48 @@ void shutDown() {
   // Activate latching circuit
 }
 
+// Function to use rotary encoder with interrupts and set logic for wraparound menu options
+void encoderISR() {
+  static int lastState = LOW;
+  static int lastEncoded = 0;
+  static long lastValue = 0;
+  static bool wraparound = true; // Default is to wrap around
 
+  // Read the current state of the pins
+  int newState = (digitalRead(rotaryA) << 1) | digitalRead(rotaryB);
+  int encoded = (lastState << 2) | newState;
 
-float calculateTemperature(int temperatureSensor) {
-  float R = Rref * (1023.0 / (float)temperatureSensor - 1.0); // Calculate NTC resistance
-  float T = 1.0 / (1.0 / (nominal_temeprature + 273.15) + log(R / nominal_resistance) / beta);
-  T -= 273.15; // convert absolute temp to C
-  return T;
+  // Determine the direction of rotation
+  int increment = 0;
+  if (encoded == 0b1101 || encoded == 0b0100 || encoded == 0b0010 || encoded == 0b1011)
+    increment = 1;
+  else if (encoded == 0b1110 || encoded == 0b0111 || encoded == 0b0001 || encoded == 0b1000)
+    increment = -1;
+
+  // Update the value if there was a valid increment
+  if (increment != 0) {
+    lastValue += increment;
+    if (wraparound) {
+      // Wraparound behavior
+      if (lastValue < minValue) {
+        lastValue = maxValue;
+      } else if (lastValue > maxValue) {
+        lastValue = minValue;
+      }
+    } else {
+      // No wraparound behavior
+      lastValue = constrain(lastValue, minValue, maxValue);
+    }
+
+    // Update the last state and encoded value
+    lastState = newState;
+    lastEncoded = encoded;
+
+    // Call the callback function with the updated value
+    encoderCallback(lastValue);
+  }
 }
+
 
 
 /*
