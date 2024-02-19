@@ -1,0 +1,30 @@
+void teaSelection() {
+  Serial.println("teaSelection function is running");
+  lcd.clear();
+  lcd.print("Select Tea");
+
+  // Initialize the encoder with the current tea index
+  encoder.setValue(currentTeaIndex);
+
+  // Wait for the nextButton to be pressed
+  while (digitalRead(NEXT_BUTTON) == HIGH) {
+    // Update the encoder
+    signed char pos = encoder.getPosition();
+    if (pos != 0) {
+      encoder.reset(); // Reset the position to 0 after reading
+      currentTeaIndex = (currentTeaIndex + pos + numTeas) % numTeas; // Update the current tea index and wrap around
+      lcd.clear();
+      lcd.print("Select Tea");
+      lcd.setCursor(0, 1);
+      lcd.print(teaParams[currentTeaIndex].name); // Display the current tea name
+      delay(generalDelay); // Delay for debouncing and display stability
+    }
+    
+    // Update the button state
+    nextButtonDebouncer.update();
+    delay(generalDelay); // Delay for debouncing
+  }
+  
+  // After the button is pressed, you can proceed with the next steps
+  // ...
+}
