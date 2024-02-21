@@ -3,9 +3,13 @@
 #include <AccelStepper.h> // Arduino non-default stepper motor library with acceleration and deceleration methods
 #include <LiquidCrystal.h> // Arduino default LCD display library
 #include <Bounce2.h> // Button debouncing library
-#include <Encoder.h> // Rotary encoder library
 #include <NewPing.h> // Ultrasonic sensor library
+#include "EncoderStepCounter.h" // Rotary encoder library
 
+#define ENCODER_PIN1 3
+#define ENCODER_INT1 digitalPinToInterrupt(ENCODER_PIN1)
+#define ENCODER_PIN2 2
+#define ENCODER_INT2 digitalPinToInterrupt(ENCODER_PIN2)
 
 // Define Digital IO pin numbers - Skip Pin 13 if possible
 
@@ -16,10 +20,6 @@ const int grabberServoPin = 5; // PWM Pin
 	// User Input
 const int loadButton = 22; // Pulled up and debounced in setup
 const int nextButton = 23; // Pulled up and debounced in setup
-// const int rotaryButton = 24; // Rotary encoder SW pin - Currently unused
-const int rotaryA = 2; // DT Pin - Interrupt capable pin - Previously Pin 2 (Interrupt pin)
-const int rotaryB = 3; // CLK Pin - Interrupt capable pin - Previously Pin 3 (Interrupt pin)
-Encoder selectorKnob(rotaryA, rotaryB); // Create Encoder object for rotary encoder "Encoder" class called "selectorKnob".
 
 	// Bool Inputs & Sensors
 const int ultrasonicTrig = 45; // Ultrasonic sensor trigger pin
@@ -107,21 +107,18 @@ teaRecipe teaParams[] = {
   {"5", 800000, 99}, //Herbal Tea
 };
 
-int currentRecipeIndex = 0;
-
-// Define variables
-int currentTeaIndex = 0;
-unsigned long selectedTeaTime = teaParams[currentTeaIndex].time;
-int selectedTeaTemp = teaParams[currentTeaIndex].temp;
+const int numTeas = sizeof(teaParams) / sizeof(teaParams[0]);
+unsigned int selectedTeaTime = 0;
+unsigned int selectedTeaTemp = 0;
 char selectedTeaName[15];
+byte currentRecipeIndex = 0;
+// Create instance for one full step encoder
+EncoderStepCounter encoder(ENCODER_PIN1, ENCODER_PIN2, HALF_STEP);
+
 const int debounceInterval = 15; // Button debounce interval in milliseconds
 int cupSizeSelection = 0;  // Variable to store whcih size the user selects (0 is small, 1 is large)
 Bounce loadButtonDebouncer = Bounce();  // Create bounce object for button
 Bounce nextButtonDebouncer = Bounce();  // Create bounce object for button
-//Bounce encoderDebouncer = Bounce();
-
-
-
 
 
 
@@ -131,8 +128,6 @@ Bounce nextButtonDebouncer = Bounce();  // Create bounce object for button
 //	MAIN CODE STARTS HERE
 //			MAIN CODE STARTS HERE
 //					MAIN CODE STARTS HERE
-
-
 
 
 
@@ -157,9 +152,12 @@ void setup() {
   elevatorRack.setMaxSpeed(800);
   elevatorRack.setAcceleration(500);
 
-  pinMode(rotaryA, INPUT_PULLUP);
-  pinMode(rotaryB, INPUT_PULLUP);
-
+  // Initialize encoder
+  encoder.begin();
+  // Initialize interrupts
+  attachInterrupt(ENCODER_INT1, interrupt, CHANGE);
+  attachInterrupt(ENCODER_INT2, interrupt, CHANGE);
+  
   pinMode(loadButton, INPUT_PULLUP);
   pinMode(nextButton, INPUT_PULLUP);
   loadButtonDebouncer.attach(loadButton, INPUT_PULLUP);
@@ -186,14 +184,14 @@ void loop() {
 //  startupInit();
 //  loadGrabber();
   teaSelection();
-  progAdjust();
- // selectCupSize();
- // preFlight();
- // pumpColdWater();
- // heatWater();
- // pumpHotWater();
- // steepFunction();
- // shutDown();
+//  progAdjust();
+// selectCupSize();
+// preFlight();
+// pumpColdWater();
+// heatWater();
+// pumpHotWater();
+// steepFunction();
+// shutDown();
 }
 
 void debugStartup() {
@@ -219,6 +217,10 @@ void debugStartup() {
     // Delay to avoid rapid changes due to noise
     delay(generalDelay);
   }
+}
+
+void interrupt() {
+  encoder.tick();
 }
 
 void rotateServoSlowly(Servo servo, int targetPosition) {
@@ -311,94 +313,46 @@ void loadGrabber() {
   delay(generalDelay);
 }
 
+
 void teaSelection() {
   Serial.println("teaSelection function is running");
   lcd.clear();
   lcd.print("Select Tea");
-
-  // Display the current tea name on the second row
-  lcd.setCursor(0, 1);
-  lcd.print(teaParams[currentTeaIndex].name);
-
-  // Initialize encoder variables
-  minValue = 0;
-  maxValue = sizeof(teaParams) / sizeof(teaParams[0]) - 1;
-
-  // Set the ISR callback function
-  encoderCallback = [](long value) {
-    currentTeaIndex = value;
-    lcd.clear();
-    lcd.print("Select Tea");
-    lcd.setCursor(0, 1);
-    lcd.print(teaParams[currentTeaIndex].name);
-    delay(generalDelay);
-  };
-
-  // Attach the ISR to the interrupt pins
-  attachInterrupt(digitalPinToInterrupt(rotaryA), encoderISR, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(rotaryB), encoderISR, CHANGE);
-
-  // Wait for the nextButton to be pressed
   while (nextButtonDebouncer.read() == HIGH) {
-    nextButtonDebouncer.update();
-    delay(generalDelay);
-  }
-
-  // Detach the ISR from the interrupt pins
-  detachInterrupt(digitalPinToInterrupt(rotaryA));
-  detachInterrupt(digitalPinToInterrupt(rotaryB));
-}
-
-
-/*
-// Previous working tea selection function without interrupts
-void teaSelection() {
-  Serial.println("teaSelection function is running");
-  lcd.clear();
-  lcd.print("Select Tea");
-
-  // Display the current tea name on the second row
-  lcd.setCursor(0, 1);
-  lcd.print(teaParams[currentTeaIndex].name);
-
-  int lastEncoderValue = selectorKnob.read() / 2; // Divide by 2 to adjust for detent behavior
-
-  // While the nextButton is not pressed, allow the user to scroll through tea options
-  while (nextButtonDebouncer.read() == HIGH) {
-    // Read changes from the rotary encoder
-    int encoderValue = selectorKnob.read() / 2; // Divide by 2 to adjust for detent behavior
-
-    // If the encoder value changes, update the LCD display and selected tea
-    if (encoderValue != lastEncoderValue) {
-      currentTeaIndex += (encoderValue > lastEncoderValue) ? 1 : -1;
-
-      // Wrap around to the first entry if reaching the end of the array
-      if (currentTeaIndex < 0) {
-        currentTeaIndex = sizeof(teaParams) / sizeof(teaParams[0]) - 1;
-      } else if (currentTeaIndex >= sizeof(teaParams) / sizeof(teaParams[0])) {
-        currentTeaIndex = 0;
+    signed char pos = encoder.getPosition();
+    if (pos != 0) {
+      if (pos > 0) {
+        currentRecipeIndex++; // Clockwise rotation
+        if (currentRecipeIndex >= numTeas) {
+          currentRecipeIndex = 0; // Loop back to the beginning
+        }
+      } else {
+        currentRecipeIndex--; // Counterclockwise rotation
+        if (currentRecipeIndex < 0) {
+          currentRecipeIndex = numTeas - 1; // Loop to the end
+        }
       }
-
-      // Update the LCD display with the new tea name
-      lcd.clear();
-      lcd.print("Select Tea");
-      lcd.setCursor(0, 1);
-      lcd.print(teaParams[currentTeaIndex].name);
-
-      // Delay to avoid rapid changes due to noise
-      delay(generalDelay);
-
-      lastEncoderValue = encoderValue;
+      encoder.reset();
+	  lcd.setCursor(0, 1);
+    lcd.print("                ");
+	  lcd.setCursor(0, 1);
+    lcd.print(teaParams[currentRecipeIndex].name);
     }
-
+    
+    // Check if the button is pressed
+    if (nextButtonDebouncer.fell()) {
+	  selectedTeaTime = teaParams[currentRecipeIndex].time;
+	  selectedTeaTemp = teaParams[currentRecipeIndex].temp;
+	  strcpy(selectedTeaName, teaParams[currentRecipeIndex].name);
+	  delay(generalDelay);
+	  return;
+    }
     // Check and debounce nextButton
     nextButtonDebouncer.update();
   }
 }
 
-*/
-
-
+/*
 void progAdjust() {
   Serial.println("progAdjust function is running");
   // Allows the user to tweak or adjust teaTime variable by using the rotary encoder (rotaryInput)
@@ -502,6 +456,8 @@ void selectCupSize() {
     }
   }
 }
+
+*/
 
 /*
 
@@ -725,49 +681,6 @@ void shutDown() {
   // Code for shutting down the unit
   // Activate latching circuit
 }
-
-// Function to use rotary encoder with interrupts and set logic for wraparound menu options
-void encoderISR() {
-  static int lastState = LOW;
-  static int lastEncoded = 0;
-  static long lastValue = 0;
-  static bool wraparound = true; // Default is to wrap around
-
-  // Read the current state of the pins
-  int newState = (digitalRead(rotaryA) << 1) | digitalRead(rotaryB);
-  int encoded = (lastState << 2) | newState;
-
-  // Determine the direction of rotation
-  int increment = 0;
-  if (encoded == 0b1101 || encoded == 0b0100 || encoded == 0b0010 || encoded == 0b1011)
-    increment = 1;
-  else if (encoded == 0b1110 || encoded == 0b0111 || encoded == 0b0001 || encoded == 0b1000)
-    increment = -1;
-
-  // Update the value if there was a valid increment
-  if (increment != 0) {
-    lastValue += increment;
-    if (wraparound) {
-      // Wraparound behavior
-      if (lastValue < minValue) {
-        lastValue = maxValue;
-      } else if (lastValue > maxValue) {
-        lastValue = minValue;
-      }
-    } else {
-      // No wraparound behavior
-      lastValue = constrain(lastValue, minValue, maxValue);
-    }
-
-    // Update the last state and encoded value
-    lastState = newState;
-    lastEncoded = encoded;
-
-    // Call the callback function with the updated value
-    encoderCallback(lastValue);
-  }
-}
-
 
 
 /*
