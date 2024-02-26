@@ -365,11 +365,11 @@ void teaSelection() {
     // Check if the button is pressed
     if (nextButtonDebouncer.fell()) {
       delay(generalDelay);
-      return;
     }
     // Check and debounce nextButton
     nextButtonDebouncer.update();
   }
+  return;
 }
 
 
@@ -413,11 +413,11 @@ void progAdjust() {
     // Exit the function if the nextButton is pressed
     if (nextButtonDebouncer.fell()) {
       delay(generalDelay);
-      return;
     }
     // Check and debounce nextButton
     nextButtonDebouncer.update();
   }
+  return;
 }
 
 /*
