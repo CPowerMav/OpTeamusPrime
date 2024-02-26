@@ -100,18 +100,19 @@ struct teaRecipe {
 };
 
 teaRecipe teaParams[] = {
-  {"1", 270000, 79}, //White Tea
-  {"2", 240000, 79}, //Green Tea
-  {"3", 210000, 91}, //Black Tea
-  {"4", 210000, 91}, //Oolong Tea
-  {"5", 800000, 99}, //Herbal Tea
+  {"White Tea", 270000, 79},  // Index 0
+  {"Green Tea", 240000, 79},  // Index 1
+  {"Black Tea", 210000, 91},  // Index 2
+  {"Oolong Tea", 210000, 91}, // Index 3
+  {"Herbal Tea", 800000, 99}, // Index 4
 };
 
-const int numTeas = sizeof(teaParams) / sizeof(teaParams[0]);
+int finalSteepTime = 0;  // Variable to store new steeping time from progAdjust function
+const int numTeas = sizeof(teaParams) / sizeof(teaParams[0]);  // Calculate size of teaRecipe array index
 unsigned int selectedTeaTime = 0;
 unsigned int selectedTeaTemp = 0;
 char selectedTeaName[15];
-byte currentRecipeIndex = 0;
+int currentRecipeIndex = 0;
 // Create instance for one full step encoder
 EncoderStepCounter encoder(ENCODER_PIN1, ENCODER_PIN2, HALF_STEP);
 
@@ -182,9 +183,10 @@ void loop() {
   delay(medWait);
 //  debugStartup();
 //  startupInit();
-//  loadGrabber();
+  loadGrabber();
   teaSelection();
-//  progAdjust();
+  progAdjust();
+  whereAmI();
 // selectCupSize();
 // preFlight();
 // pumpColdWater();
@@ -192,6 +194,22 @@ void loop() {
 // pumpHotWater();
 // steepFunction();
 // shutDown();
+}
+
+void whereAmI() {
+  Serial.println("Code has moved to the next phase correctly");
+  lcd.clear();
+  lcd.print("WhereAmI");
+  Serial.println("Current variables are: ");
+  Serial.print("Tea Index: ");
+  Serial.println(currentRecipeIndex);
+  Serial.print("Tea Name: ");
+  Serial.println(teaParams[currentRecipeIndex].name);
+  Serial.print("Tea Time: ");
+  Serial.println(teaParams[currentRecipeIndex].time);
+  Serial.print("Tea Temp: ");
+  Serial.println(teaParams[currentRecipeIndex].temp);
+  delay(500000);
 }
 
 void debugStartup() {
@@ -219,7 +237,7 @@ void debugStartup() {
   }
 }
 
-void interrupt() {
+void interrupt() {  // Used for encoder library to track interrupts
   encoder.tick();
 }
 
@@ -318,34 +336,84 @@ void teaSelection() {
   Serial.println("teaSelection function is running");
   lcd.clear();
   lcd.print("Select Tea");
+  // Print initial value of currentRecipeIndex
+  lcd.setCursor(0, 1);
+  lcd.print(teaParams[currentRecipeIndex].name);
+  nextButtonDebouncer.update();
+
   while (nextButtonDebouncer.read() == HIGH) {
     signed char pos = encoder.getPosition();
     if (pos != 0) {
       if (pos > 0) {
-        currentRecipeIndex++; // Clockwise rotation
+        currentRecipeIndex++;  // Clockwise rotation
         if (currentRecipeIndex >= numTeas) {
-          currentRecipeIndex = 0; // Loop back to the beginning
+          currentRecipeIndex = 0;  // Loop back to the beginning
         }
       } else {
-        currentRecipeIndex--; // Counterclockwise rotation
+        currentRecipeIndex--;  // Counterclockwise rotation
         if (currentRecipeIndex < 0) {
-          currentRecipeIndex = numTeas - 1; // Loop to the end
+          currentRecipeIndex = numTeas - 1;  // Loop to the end
         }
       }
       encoder.reset();
-	  lcd.setCursor(0, 1);
-    lcd.print("                ");
-	  lcd.setCursor(0, 1);
-    lcd.print(teaParams[currentRecipeIndex].name);
+      lcd.setCursor(0, 1);
+      lcd.print("                ");
+      lcd.setCursor(0, 1);
+      lcd.print(teaParams[currentRecipeIndex].name);
     }
-    
+
     // Check if the button is pressed
     if (nextButtonDebouncer.fell()) {
-	  selectedTeaTime = teaParams[currentRecipeIndex].time;
-	  selectedTeaTemp = teaParams[currentRecipeIndex].temp;
-	  strcpy(selectedTeaName, teaParams[currentRecipeIndex].name);
-	  delay(generalDelay);
-	  return;
+      delay(generalDelay);
+      return;
+    }
+    // Check and debounce nextButton
+    nextButtonDebouncer.update();
+  }
+}
+
+
+void progAdjust() {
+  Serial.println("progAdjust function is running");
+  long adjustedTime = 0;  //Variable to store adjusted time delta
+  lcd.clear();
+  lcd.print("Adj Steep Time");
+  lcd.setCursor(0, 1);
+  lcd.print("+0s");
+  Serial.print("BeforeWhileStatement: ");
+  Serial.println(adjustedTime);
+  // While the nextButton is not pressed, allow the user to adjust the steep time
+  while (nextButtonDebouncer.read() == HIGH) {
+    signed char pos = encoder.getPosition();
+    if (pos != 0) {
+      if (pos > 0) {
+        adjustedTime = adjustedTime + steepTimeAdjustInterval;  // Clockwise rotation
+        Serial.print("ifPos>0: ");
+        Serial.println(adjustedTime);
+      } else {
+        adjustedTime = adjustedTime - steepTimeAdjustInterval;  // Counter-clockwise rotation
+        Serial.print("elsePos<0: ");
+        Serial.println(adjustedTime);
+      }
+      encoder.reset();
+      Serial.print("InsideWhileStatement: ");
+      Serial.println(adjustedTime);
+      // Display plus or minus and the total time dynamically on the second line
+      lcd.setCursor(0, 1);
+      lcd.print("                ");
+      lcd.setCursor(0, 1);
+      lcd.print(adjustedTime >= 0 ? "+" : "-");
+      lcd.print(abs(adjustedTime)/1000);
+      lcd.print("s");
+
+      // Calculate adjusted steep time
+      //int finalSteepTime = teaParams[currentRecipeIndex].time + adjustedTime;
+    }
+
+    // Exit the function if the nextButton is pressed
+    if (nextButtonDebouncer.fell()) {
+      delay(generalDelay);
+      return;
     }
     // Check and debounce nextButton
     nextButtonDebouncer.update();
@@ -353,7 +421,7 @@ void teaSelection() {
 }
 
 /*
-void progAdjust() {
+void progAdjustOld() {
   Serial.println("progAdjust function is running");
   // Allows the user to tweak or adjust teaTime variable by using the rotary encoder (rotaryInput)
   // to add or subtract time from teaTime variable in increments of 30 seconds (30000ms)
