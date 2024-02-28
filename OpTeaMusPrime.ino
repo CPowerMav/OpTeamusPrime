@@ -105,12 +105,13 @@ struct teaRecipe {
 };
 
 teaRecipe teaParams[] = {
-  {"White Tea", 270000, 79},  // Index 0
-  {"Green Tea", 240000, 79},  // Index 1
-  {"Black Tea", 210000, 91},  // Index 2
-  {"Oolong Tea", 210000, 91}, // Index 3
-  {"Herbal Tea", 800000, 99}, // Index 4
+  {"White Tea", 120000, 75},  // Index 0
+  {"Green Tea", 120000, 75},  // Index 1
+  {"Black Tea", 210000, 95},  // Index 2
+  {"Oolong Tea", 210000, 95}, // Index 3
+  {"Herbal Tea", 480000, 99}, // Index 4
 };
+
 
 int finalSteepTime = 0;  // Variable to store new steeping time from progAdjust function
 const int numTeas = sizeof(teaParams) / sizeof(teaParams[0]);  // Calculate size of teaRecipe array index
