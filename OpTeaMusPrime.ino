@@ -18,8 +18,13 @@ const int pivotServoPin = 4; // PWM Pin
 const int grabberServoPin = 5; // PWM Pin
 
 	// User Input
-const int loadButton = 22; // Pulled up and debounced in setup
-const int nextButton = 23; // Pulled up and debounced in setup
+const int loadButtonPin = 22; // Pulled up and debounced in setup
+const int nextButtonPin = 23; // Pulled up and debounced in setup
+  
+  // Create "Bounce2" button objects for debouncing buttons
+Bounce2::Button loadButton = Bounce2::Button();
+Bounce2::Button nextButton = Bounce2::Button();
+const int debounceInterval = 10; // Button debounce interval in milliseconds
 
 	// Bool Inputs & Sensors
 const int ultrasonicTrig = 45; // Ultrasonic sensor trigger pin
@@ -116,10 +121,7 @@ int currentRecipeIndex = 0;
 // Create instance for one full step encoder
 EncoderStepCounter encoder(ENCODER_PIN1, ENCODER_PIN2, HALF_STEP);
 
-const int debounceInterval = 15; // Button debounce interval in milliseconds
 int cupSizeSelection = 0;  // Variable to store whcih size the user selects (0 is small, 1 is large)
-Bounce loadButtonDebouncer = Bounce();  // Create bounce object for button
-Bounce nextButtonDebouncer = Bounce();  // Create bounce object for button
 
 
 
@@ -159,12 +161,22 @@ void setup() {
   attachInterrupt(ENCODER_INT1, interrupt, CHANGE);
   attachInterrupt(ENCODER_INT2, interrupt, CHANGE);
   
-  pinMode(loadButton, INPUT_PULLUP);
+  // Button setup and debouncing
+  loadButton.attach(loadButtonPin, INPUT_PULLUP);
+  loadButton.interval(debounceInterval);
+  loadButton.setPressedState(LOW);
+
+  nextButton.attach(nextButtonPin, INPUT_PULLUP);
+  nextButton.interval(debounceInterval);
+  nextButton.setPressedState(LOW);
+
+/*  pinMode(loadButton, INPUT_PULLUP);  // previous button setups that didnt work reliably
   pinMode(nextButton, INPUT_PULLUP);
   loadButtonDebouncer.attach(loadButton, INPUT_PULLUP);
   loadButtonDebouncer.interval(debounceInterval);
   nextButtonDebouncer.attach(nextButton, INPUT_PULLUP);
   nextButtonDebouncer.interval(debounceInterval);
+*/
 
   pinMode(ultrasonicTrig, OUTPUT);
   pinMode(ultrasonicEcho, INPUT);
@@ -178,15 +190,20 @@ void setup() {
 
 
 void loop() {
+  nextButton.update();
+  loadButton.update();
 // Main loop calls functions declared below
   Serial.println("The main loop function is starting");
-  delay(medWait);
-//  debugStartup();
+  //delay(medWait);
+  debugStartup();
+  Serial.println("The main loop debugStartup is finished, moving to loadGrabber");
 //  startupInit();
   loadGrabber();
+  Serial.println("The main loop loadGrabber function is finished, moving to teaSelection");
   teaSelection();
+  Serial.println("The main loop teaSelection function is finished, moving to progAdjust");
   progAdjust();
-  whereAmI();
+ // whereAmI();
 // selectCupSize();
 // preFlight();
 // pumpColdWater();
@@ -196,7 +213,7 @@ void loop() {
 // shutDown();
 }
 
-void whereAmI() {
+/*void whereAmI() {
   Serial.println("Code has moved to the next phase correctly");
   lcd.clear();
   lcd.print("WhereAmI");
@@ -211,30 +228,34 @@ void whereAmI() {
   Serial.println(teaParams[currentRecipeIndex].temp);
   delay(500000);
 }
+*/
 
 void debugStartup() {
+  nextButton.update();
   Serial.println("debugStartup is running!");
-  // Allows the user to tweak or adjust teaTime variable by using the rotary encoder (rotaryInput)
-  // to add or subtract time from teaTime variable in increments of 30 seconds (30000ms)
-
   // Clear the LCD display
   lcd.clear();
   lcd.print("Press start");
-
+  Serial.print("Before WHILE Loop:  ");
+  Serial.println(nextButton.read());
   // While the nextButton is not pressed, allow the user to adjust the steep time
-  while (nextButtonDebouncer.read() == HIGH) {
+  while (true) {
+    nextButton.update();
+    Serial.print("Inside WHILE Loop:  ");
+    Serial.println(nextButton.read());
 
-    // Check and debounce nextButton
-    nextButtonDebouncer.update();
-
-    // Exit the function if the nextButton is pressed
-    if (nextButtonDebouncer.fell()) {
+    if (nextButton.fell()) {
+      // Next button pressed, exit the function
+      Serial.println("Next button pressed, exiting debutStartup function");
+      delay(5000);
       return;
     }
 
     // Delay to avoid rapid changes due to noise
     delay(generalDelay);
   }
+  Serial.print("End of total function:  ");
+  Serial.println(nextButton.read());
 }
 
 void interrupt() {  // Used for encoder library to track interrupts
@@ -304,31 +325,32 @@ void startupInit() {
 
 void loadGrabber() {
   Serial.println("loadGrabber function is running");
+      // Print instructions to the LCD
+    lcd.clear();
+    lcd.print("Hold load btn");
+    lcd.setCursor(0, 1);
+    lcd.print("Then next");
 
-  // Print instructions to the LCD
-  lcd.clear();
-  lcd.print("Hold load btn");
-  lcd.setCursor(0, 1);
-  lcd.print("Then next");
-  delay(generalDelay);
-  grabberServo.write(CLOSE);  // Start by closing the grabber
-  nextButtonDebouncer.update();
+  while (true) {
+    nextButton.update();
+    loadButton.update();
 
-  while (digitalRead(nextButton) == HIGH) {
-    // Update debouncer for loadButton
-    loadButtonDebouncer.update();
-    nextButtonDebouncer.update();
-    // Check debounced button state
-    if (loadButtonDebouncer.fell()) {
+    if (nextButton.fell()) {
+      // Next button pressed, exit the function
+      Serial.println("Next button pressed, exiting loadGrabber function");
+      return;
+    }
+
+    if (loadButton.read() == LOW) {
       // Load button pressed
       grabberServo.write(OPEN);
-    } else if (loadButtonDebouncer.rose()) {
+    } else {
       // Load button released
       grabberServo.write(CLOSE);
     }
-    delay(generalDelay); // Avoid rapid checking
+    
+    delay(generalDelay);
   }
-  delay(generalDelay);
 }
 
 
@@ -339,9 +361,9 @@ void teaSelection() {
   // Print initial value of currentRecipeIndex
   lcd.setCursor(0, 1);
   lcd.print(teaParams[currentRecipeIndex].name);
-  nextButtonDebouncer.update();
 
-  while (nextButtonDebouncer.read() == HIGH) {
+  while (true) {
+    nextButton.update();
     signed char pos = encoder.getPosition();
     if (pos != 0) {
       if (pos > 0) {
@@ -361,15 +383,13 @@ void teaSelection() {
       lcd.setCursor(0, 1);
       lcd.print(teaParams[currentRecipeIndex].name);
     }
-
     // Check if the button is pressed
-    if (nextButtonDebouncer.fell()) {
+    if (nextButton.fell()) {
       delay(generalDelay);
+      return;
     }
-    // Check and debounce nextButton
-    nextButtonDebouncer.update();
+  delay(generalDelay);
   }
-  return;
 }
 
 
@@ -383,7 +403,7 @@ void progAdjust() {
   Serial.print("BeforeWhileStatement: ");
   Serial.println(adjustedTime);
   // While the nextButton is not pressed, allow the user to adjust the steep time
-  while (nextButtonDebouncer.read() == HIGH) {
+  while (nextButton.read() == HIGH) {
     signed char pos = encoder.getPosition();
     if (pos != 0) {
       if (pos > 0) {
@@ -411,13 +431,11 @@ void progAdjust() {
     }
 
     // Exit the function if the nextButton is pressed
-    if (nextButtonDebouncer.fell()) {
+    if (nextButton.fell()) {
       delay(generalDelay);
     }
-    // Check and debounce nextButton
-    nextButtonDebouncer.update();
+    nextButton.update();
   }
-  return;
 }
 
 /*
