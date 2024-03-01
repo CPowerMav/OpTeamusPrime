@@ -4,7 +4,7 @@
 #include <LiquidCrystal.h> // Arduino default LCD display library
 #include <Bounce2.h> // Button debouncing library
 #include <NewPing.h> // Ultrasonic sensor library
-#include "EncoderStepCounter.h" // Rotary encoder library
+#include <EncoderStepCounter.h> // Rotary encoder library
 
 #define ENCODER_PIN1 3
 #define ENCODER_INT1 digitalPinToInterrupt(ENCODER_PIN1)
@@ -44,8 +44,7 @@ const int waterReservoir = A1;  // Water level probes inside cold water reservoi
 const int waterFill = A2;  // Water level probe inside boiler for regular size
 const int waterFillMax = A3; // Water level probe inside boiler for max size
 
-// NTC Thermistor constants
-// Thermistor red to 5v, black to junction of 5k resistor, junction to A0, 5k resistor to ground
+// NTC Thermistor red to 5v, black to junction of 5k resistor, junction to A0, 5k resistor to ground
 const float Rref = 5000.0;  // Reference resistance
 const float nominal_temeprature = 25.0;  // Nominal temperature in Celsius
 const float nominal_resistance = 50000.0;  // Nominal resistance at nominal temperature (ohms)
@@ -68,7 +67,6 @@ const int shortWait = 100; // Some delay variables
 const int medWait = 1000; // Some delay variables
 const int longWait = 5000; // Some delay variables
 
-
 // Create Servo and Stepper objects
 Servo pivotServo; // Create pivotServo object using Servo library class
 Servo grabberServo; // Create grabberServo object using Servo library class
@@ -84,13 +82,13 @@ int calculateSteps(float distanceCm) {
   return static_cast<int>((distanceCm * 10 / ballscrewPitch) * stepsPerRevolution);
 }
 
-// Word substitutions for pivotServo positions
-const int stupidOffset = -10; // pivotServo gets out of alignment. This is a stupid fix for that globally.
-const int NORTH = 33+stupidOffset; // For pivotServo pointing straight up
-const int EAST = 75+stupidOffset; // For pivotServo pointing to the right
-const int SOUTH = 120+stupidOffset; // For pivotServo pointing straight down - This is the expected initial position and index pivot arm to be pointing down
-const int SEAST = 98+stupidOffset; // For pivotServo down and right
-const int NEAST = 56+stupidOffset; // For pivotServo up and right
+// Word substitutions for pivotServo positions.
+const int pivotOffset = 0; // pivotServo gets out of alignment. Plus value is servo more towards wood plank (opposite for grabber angle)
+const int NORTH = 10+pivotOffset; // For pivotServo pointing straight up
+const int EAST = 47+pivotOffset; // For pivotServo pointing to the right
+const int SOUTH = 87+pivotOffset; // For pivotServo pointing straight down - This is the expected initial position and index pivot arm to be pointing down
+const int SEAST = 67+pivotOffset; // For pivotServo down and right
+const int NEAST = 27+pivotOffset; // For pivotServo up and right
 
 // Word substitutions for grabberServo positions
 const int CLOSE = 90; // Grabber servo closed position (90 deg)
@@ -105,15 +103,16 @@ struct teaRecipe {
 };
 
 teaRecipe teaParams[] = {
-  {"White Tea", 120000, 75},  // Index 0
-  {"Green Tea", 120000, 75},  // Index 1
-  {"Black Tea", 210000, 95},  // Index 2
-  {"Oolong Tea", 210000, 95}, // Index 3
-  {"Herbal Tea", 480000, 99}, // Index 4
+  {"Green Tea", 120000, 78},   // Index 0
+  {"White Tea", 150000, 78},   // Index 1
+  {"Oolong Tea", 180000, 90},  // Index 2
+  {"Black Tea", 240000, 98},   // Index 3
+  {"Herbal Tea", 300000, 99},  // Index 4
+  // Future option:   {"Hot Water", 0, 99},  // Index 5
 };
 
 
-int finalSteepTime = 0;  // Variable to store new steeping time from progAdjust function
+unsigned long finalSteepTime = 0;  // Variable to store new steeping time from progAdjust function
 const int numTeas = sizeof(teaParams) / sizeof(teaParams[0]);  // Calculate size of teaRecipe array index
 unsigned int selectedTeaTime = 0;
 unsigned int selectedTeaTemp = 0;
@@ -128,9 +127,9 @@ int cupSizeSelection = 0;  // Variable to store whcih size the user selects (0 i
 
 
 //					MAIN CODE STARTS HERE
-//			MAIN CODE STARTS HERE
-//	MAIN CODE STARTS HERE
-//			MAIN CODE STARTS HERE
+//			MAIN CODE STARTS HERE  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//	MAIN CODE STARTS HERE      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//			MAIN CODE STARTS HERE  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //					MAIN CODE STARTS HERE
 
 
@@ -139,7 +138,6 @@ int cupSizeSelection = 0;  // Variable to store whcih size the user selects (0 i
 void setup() {
   Serial.begin(9600);
   Serial.println("Void setup is running");
-
   pinMode(elevatorRackLimitSwitch, INPUT_PULLUP);
   pinMode(heatingCoil, OUTPUT);
   pinMode(airPump, OUTPUT);
@@ -152,7 +150,7 @@ void setup() {
   delay(generalDelay);
 
   grabberServo.attach(grabberServoPin);
-  pivotServo.attach(pivotServoPin);
+  pivotServo.attach(pivotServoPin, 500, 2500); // Min pulse is 500uSec and max is 2500uSec for AGFRC B53DHS Servo
   elevatorRack.setMaxSpeed(800);
   elevatorRack.setAcceleration(500);
 
@@ -170,41 +168,43 @@ void setup() {
   nextButton.attach(nextButtonPin, INPUT_PULLUP);
   nextButton.interval(debounceInterval);
   nextButton.setPressedState(LOW);
-
-/*  pinMode(loadButton, INPUT_PULLUP);  // previous button setups that didnt work reliably
-  pinMode(nextButton, INPUT_PULLUP);
-  loadButtonDebouncer.attach(loadButton, INPUT_PULLUP);
-  loadButtonDebouncer.interval(debounceInterval);
-  nextButtonDebouncer.attach(nextButton, INPUT_PULLUP);
-  nextButtonDebouncer.interval(debounceInterval);
-*/
-
+  
+  // Ultrasonic configs
   pinMode(ultrasonicTrig, OUTPUT);
   pinMode(ultrasonicEcho, INPUT);
 
+  // Ensure these devices are turned off on initial setup
   digitalWrite(heatingCoil, LOW); // SSR set to low until needed.
   digitalWrite(airPump, HIGH);  // For some reason relay module has NO closed when low. So set to HIGH at setup. LOW to activate.
   digitalWrite(waterPump, HIGH); // For some reason relay module has NO closed when low. So set to HIGH at setup. LOW to activate.
+  grabberServo.write(OPEN);
 
 }
 
-
-
 void loop() {
-  nextButton.update();
-  loadButton.update();
-// Main loop calls functions declared below
-  Serial.println("The main loop function is starting");
-  //delay(medWait);
-  debugStartup();
-  Serial.println("The main loop debugStartup is finished, moving to loadGrabber");
-//  startupInit();
-  loadGrabber();
-  Serial.println("The main loop loadGrabber function is finished, moving to teaSelection");
-  teaSelection();
-  Serial.println("The main loop teaSelection function is finished, moving to progAdjust");
-  progAdjust();
- // whereAmI();
+ nextButton.update();  // First refresh of buttons states required here
+ loadButton.update();  // First refresh of buttons states required here
+   // Main loop calls functions declared below
+    Serial.println("The main loop function is starting");
+  pivotServoCalibration();
+  //debugStartup();
+    Serial.println("The main loop debugStartup is finished, moving to startupInit");
+    delay(generalDelay);
+  //startupInit();
+    Serial.println("The main loop startupInit is finished, moving to loadGrabber");
+    delay(generalDelay);
+  //loadGrabber();
+    Serial.println("The main loop loadGrabber function is finished, moving to teaSelection");
+    delay(generalDelay);
+  //teaSelection();
+    Serial.println("The main loop teaSelection function is finished, moving to progAdjust");
+    delay(generalDelay);
+  //progAdjust();
+    Serial.println("The main loop progAdjust function is finished, moving to whereAmI");
+    delay(generalDelay);
+  //whereAmI();
+    Serial.println("The main loop whereAmI function is finished, moving to the beginning of the loop.");
+    delay(generalDelay);
 // selectCupSize();
 // preFlight();
 // pumpColdWater();
@@ -214,7 +214,42 @@ void loop() {
 // shutDown();
 }
 
-/*void whereAmI() {
+void pivotServoCalibration() {
+  //pivotServo rotation arm degree calibration
+  while(true) {
+  pivotServo.write(SOUTH);  // South grabber facing down
+  Serial.println("We're pointing South.");
+  delay(1000);
+  pivotServo.write(SEAST);  // SouthEast
+  Serial.println("We're pointing SouthEast.");
+  delay(1000);
+  pivotServo.write(EAST);  // East
+  Serial.println("We're pointing East.");
+  delay(1000);
+  pivotServo.write(NEAST);  // NorthEast
+  Serial.println("We're pointing NorthEast.");
+  delay(1000);
+  pivotServo.write(NORTH);  // North
+  Serial.println("We're pointing North.");
+  delay(3000);
+  }
+}
+
+
+void rotateServoSlowly(Servo servo, int targetPosition) {
+  // Function to rotate the servo slowly to the specified position
+  int currentPosition = servo.read();
+  int step = (targetPosition > currentPosition) ? 1 : -1;
+
+  while (currentPosition != targetPosition) {
+    currentPosition += step;
+    servo.write(currentPosition);
+    Serial.println("Inside rotateServoSlowly WHILE Loop");
+    delay(servoDelay);  // Adjust the delay for the desired rotation speed
+  }
+}
+
+void whereAmI() {
   Serial.println("Code has moved to the next phase correctly");
   lcd.clear();
   lcd.print("WhereAmI");
@@ -227,9 +262,9 @@ void loop() {
   Serial.println(teaParams[currentRecipeIndex].time);
   Serial.print("Tea Temp: ");
   Serial.println(teaParams[currentRecipeIndex].temp);
-  delay(500000);
+  delay(5000);
 }
-*/
+
 
 void debugStartup() {
   nextButton.update();
@@ -237,21 +272,14 @@ void debugStartup() {
   // Clear the LCD display
   lcd.clear();
   lcd.print("Press start");
-  Serial.print("Before WHILE Loop:  ");
-  Serial.println(nextButton.read());
-  // While the nextButton is not pressed, allow the user to adjust the steep time
   while (true) {
     nextButton.update();
-    Serial.print("Inside WHILE Loop:  ");
-    Serial.println(nextButton.read());
-
     if (nextButton.fell()) {
       // Next button pressed, exit the function
       Serial.println("Next button pressed, exiting debutStartup function");
-      delay(5000);
+      delay(generalDelay);
       return;
     }
-
     // Delay to avoid rapid changes due to noise
     delay(generalDelay);
   }
@@ -263,18 +291,6 @@ void interrupt() {  // Used for encoder library to track interrupts
   encoder.tick();
 }
 
-void rotateServoSlowly(Servo servo, int targetPosition) {
-  // Function to rotate the servo slowly to the specified position
-  int currentPosition = servo.read();
-  int step = (targetPosition > currentPosition) ? 1 : -1;
-
-  while (currentPosition != targetPosition) {
-    currentPosition += step;
-    servo.writeMicroseconds(map(currentPosition, 0, 180, 1000, 2000));
-    delay(servoDelay);  // Adjust the delay for the desired rotation speed
-  }
-}
-
 void startupInit() {
   Serial.println("startupInit function is running");
 
@@ -284,21 +300,20 @@ void startupInit() {
   lcd.setCursor(0, 1);
   lcd.print("Getting ready..");
   delay(generalDelay);
-  //Trying to get initial rotation to be slower
-  for (int i = pivotServo.read(); i < SOUTH; i++) {
-    pivotServo.write(i);
-    delay(servoDelay);  // Adjust the delay for the desired movement speed
-  }
+  int targetPosition = SOUTH;                     // Set the target position (degrees)
+  rotateServoSlowly(pivotServo, targetPosition);  // Call the function to rotate the servo
+  delay(1000);                                    // Delay for 1 second (1000 milliseconds)
+
   // Perform homing procedure
   Serial.println("Homing procedure started...");
   delay(shortWait);
-  
+
   lcd.clear();
   lcd.print("Rack Indexing...");
   delay(generalDelay);
-  
+
   while (digitalRead(elevatorRackLimitSwitch) == HIGH) {
-    elevatorRack.moveTo(-12000); // Adjust the distance as needed  //-12000 steps is up (negative) 12cm
+    elevatorRack.moveTo(-12000);  // Adjust the distance as needed  //-12000 steps is up (negative) 12cm
     elevatorRack.run();
   }
 
@@ -315,33 +330,29 @@ void startupInit() {
     elevatorRack.run();
   }
   elevatorRack.stop();
-  
+
   Serial.println("Homing procedure completed.");
   delay(medWait);
-
-  rotateServoSlowly(pivotServo, SOUTH); // Now that the elevator is at the top position, rotate grabber to SOUTH
-
+  rotateServoSlowly(pivotServo, targetPosition);
 }
 
 
 void loadGrabber() {
   Serial.println("loadGrabber function is running");
-      // Print instructions to the LCD
-    lcd.clear();
-    lcd.print("Hold load btn");
-    lcd.setCursor(0, 1);
-    lcd.print("Then next");
-
+  // Print instructions to the LCD
+  lcd.clear();
+  lcd.print("Hold load btn");
+  lcd.setCursor(0, 1);
+  lcd.print("Then next");
+  grabberServo.write(CLOSE);
   while (true) {
     nextButton.update();
     loadButton.update();
-
     if (nextButton.fell()) {
       // Next button pressed, exit the function
       Serial.println("Next button pressed, exiting loadGrabber function");
       return;
     }
-
     if (loadButton.read() == LOW) {
       // Load button pressed
       grabberServo.write(OPEN);
@@ -349,7 +360,6 @@ void loadGrabber() {
       // Load button released
       grabberServo.write(CLOSE);
     }
-    
     delay(generalDelay);
   }
 }
@@ -389,112 +399,88 @@ void teaSelection() {
       delay(generalDelay);
       return;
     }
-  delay(generalDelay);
+    delay(generalDelay);
   }
 }
 
 
 void progAdjust() {
   Serial.println("progAdjust function is running");
-  long adjustedTime = 0;  //Variable to store adjusted time delta
+  long adjustedTime = 0;  // Variable to store adjusted time delta
   lcd.clear();
   lcd.print("Adj Steep Time");
   lcd.setCursor(0, 1);
   lcd.print("+0s");
   Serial.print("BeforeWhileStatement: ");
   Serial.println(adjustedTime);
+
   // While the nextButton is not pressed, allow the user to adjust the steep time
-  while (nextButton.read() == HIGH) {
+  while (true) {
+    nextButton.update();
     signed char pos = encoder.getPosition();
+    
     if (pos != 0) {
       if (pos > 0) {
-        adjustedTime = adjustedTime + steepTimeAdjustInterval;  // Clockwise rotation
+        adjustedTime += steepTimeAdjustInterval;  // Clockwise rotation
         Serial.print("ifPos>0: ");
         Serial.println(adjustedTime);
       } else {
-        adjustedTime = adjustedTime - steepTimeAdjustInterval;  // Counter-clockwise rotation
+        adjustedTime -= steepTimeAdjustInterval;  // Counter-clockwise rotation
         Serial.print("elsePos<0: ");
         Serial.println(adjustedTime);
       }
+      
+      // Check if adjusted time falls below one minute
+      if (teaParams[currentRecipeIndex].time + adjustedTime < 60000) {
+        lcd.clear();
+        lcd.print("Error");
+        lcd.setCursor(0, 1);
+        lcd.print("Time too low");
+        delay(3000); // Delay for 3 seconds to display the error message
+        
+        // Display "Resetting" message
+        lcd.clear();
+        lcd.print("Resetting");
+        lcd.setCursor(0, 1);
+        lcd.print("Adj to zero");
+        delay(2000); // Delay for 2 seconds to display the resetting message
+        
+        lcd.clear();
+        lcd.print("Adj Steep Time");
+        lcd.setCursor(0, 1);
+        lcd.print("+0s");
+        
+        adjustedTime = 0;  // Reset adjusted time to zero
+      }
+      
       encoder.reset();
       Serial.print("InsideWhileStatement: ");
       Serial.println(adjustedTime);
+      
       // Display plus or minus and the total time dynamically on the second line
       lcd.setCursor(0, 1);
       lcd.print("                ");
       lcd.setCursor(0, 1);
       lcd.print(adjustedTime >= 0 ? "+" : "-");
-      lcd.print(abs(adjustedTime)/1000);
+      lcd.print(abs(adjustedTime) / 1000);
       lcd.print("s");
 
       // Calculate adjusted steep time
-      //int finalSteepTime = teaParams[currentRecipeIndex].time + adjustedTime;
+      finalSteepTime = teaParams[currentRecipeIndex].time + adjustedTime;
     }
 
     // Exit the function if the nextButton is pressed
     if (nextButton.fell()) {
+      Serial.print("The value of finalSteepTime is: ");
+      Serial.println(finalSteepTime);
       delay(generalDelay);
-    }
-    nextButton.update();
-  }
-}
-
-/*
-void progAdjustOld() {
-  Serial.println("progAdjust function is running");
-  // Allows the user to tweak or adjust teaTime variable by using the rotary encoder (rotaryInput)
-  // to add or subtract time from teaTime variable in increments of 30 seconds (30000ms)
-
-  // Clear the LCD display
-  lcd.clear();
-  lcd.print("Adjust steep");
-
-  // Initialize the encoder value and last value
-  int encoderValue = 0;
-  int encoderLastValue = 0;
-
-  // While the nextButton is not pressed, allow the user to adjust the steep time
-  while (nextButtonDebouncer.read() == HIGH) {
-    // Read changes from the selectorKnob
-    int selectorKnobChange = selectorKnob.read();
-
-    // Update selectorKnobValue based on the change
-    int selectorKnobValue = selectorKnobChange;
-
-    // Ensure the selectorKnob value stays within valid bounds
-    selectorKnobValue = constrain(selectorKnobValue, -1, 1);
-
-    // If the selectorKnob value changes, update the LCD display and encoder value
-    if (selectorKnobChange != 0) {
-      encoderValue += selectorKnobValue;
-
-      // Calculate adjusted steep time
-      int adjustedTime = selectedTeaTime + encoderValue * steepTimeAdjustInterval;
-
-      // Display plus or minus and the total time dynamically on the second line
-      lcd.setCursor(0, 1);
-      lcd.print(encoderValue > 0 ? "+" : "-");
-      lcd.print(abs(adjustedTime) / 1000);
-      lcd.print("s");
-
-      // Update the last encoder value
-      encoderLastValue = encoderValue;
-    }
-
-    // Check and debounce nextButton
-    nextButtonDebouncer.update();
-
-    // Exit the function if the nextButton is pressed
-    if (nextButtonDebouncer.fell()) {
       return;
     }
-
-    // Delay to avoid rapid changes due to noise
     delay(generalDelay);
   }
 }
 
-
+/*
 void selectCupSize() {
   Serial.println("selectCupSize fucnction is running");
   // Clear the LCD display
@@ -820,21 +806,3 @@ void loop() {
 }
 */
 
-/*
-Grabber servo rotation arm degree calibration
-  pivotServo.write(120);  // South grabber facing down
-  Serial.println("We're pointing South.");
-  delay(1000);
-  pivotServo.write(98);  // SouthEast
-  Serial.println("We're pointing SouthEast.");
-  delay(1000);
-  pivotServo.write(75);  // East
-  Serial.println("We're pointing East.");
-  delay(1000);
-  pivotServo.write(56);  // NorthEast
-  Serial.println("We're pointing NorthEast.");
-  delay(1000);
-  pivotServo.write(33);  // North
-  Serial.println("We're pointing North.");
-  delay(5000);
-  */
