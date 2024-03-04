@@ -61,7 +61,7 @@ float calculateTemperature(int temperatureSensor) {
 // Define other constants
 const int dispenseDuration = 10000;  // Air pump avtivation time to dispense all hot water from boiler to cup (in milliseconds)
 const int generalDelay = 15; // Update this to adjust the general delay time for all functions
-const int servoDelay = 20; // Update this to adjust the slow movement of servos
+const int servoDelay = 30; // Update this to adjust the slow movement of servos
 const int steepTimeAdjustInterval = 30000; // Adjust steep time by this increment in +/- milliseconds
 const int shortWait = 100; // Some delay variables
 const int medWait = 1000; // Some delay variables
@@ -83,16 +83,16 @@ int calculateSteps(float distanceCm) {
 }
 
 // Word substitutions for pivotServo positions.
-const int pivotOffset = 0; // pivotServo gets out of alignment. Plus value is servo more towards wood plank (opposite for grabber angle)
-const int NORTH = 10+pivotOffset; // For pivotServo pointing straight up
-const int EAST = 47+pivotOffset; // For pivotServo pointing to the right
-const int SOUTH = 87+pivotOffset; // For pivotServo pointing straight down - This is the expected initial position and index pivot arm to be pointing down
-const int SEAST = 67+pivotOffset; // For pivotServo down and right
-const int NEAST = 27+pivotOffset; // For pivotServo up and right
+const byte pivotOffset = 0; // pivotServo gets out of alignment. Plus value is servo more towards wood plank (opposite for grabber angle)
+const byte NORTH = 8+pivotOffset; // For pivotServo pointing straight up
+const byte EAST  = 45+pivotOffset; // For pivotServo pointing to the right
+const byte SOUTH = 90+pivotOffset; // For pivotServo pointing straight down - This is the expected initial position and index pivot arm to be pointing down
+const byte SEAST = 65+pivotOffset; // For pivotServo down and right
+const byte NEAST = 23+pivotOffset; // For pivotServo up and right
 
 // Word substitutions for grabberServo positions
-const int CLOSE = 90; // Grabber servo closed position (90 deg)
-const int OPEN = 0; // Grabber servo open position (0 deg)
+const byte CLOSE = 90; // Grabber servo closed position (90 deg)
+const byte OPEN = 0; // Grabber servo open position (0 deg)
 
 
 // Define Tea Types
@@ -121,7 +121,7 @@ int currentRecipeIndex = 0;
 // Create instance for one full step encoder
 EncoderStepCounter encoder(ENCODER_PIN1, ENCODER_PIN2, HALF_STEP);
 
-int cupSizeSelection = 0;  // Variable to store whcih size the user selects (0 is small, 1 is large)
+byte cupSizeSelection = 0;  // Variable to store whcih size the user selects (0 is small, 1 is large)
 
 
 
@@ -138,6 +138,12 @@ int cupSizeSelection = 0;  // Variable to store whcih size the user selects (0 i
 void setup() {
   Serial.begin(9600);
   Serial.println("Void setup is running");
+  Serial.println("Setting default servo position NOW");
+  pivotServo.write(SOUTH);
+  grabberServo.write(OPEN);
+  delay(servoDelay);
+  Serial.println("Servo default position DONE");
+  delay(servoDelay);
   pinMode(elevatorRackLimitSwitch, INPUT_PULLUP);
   pinMode(heatingCoil, OUTPUT);
   pinMode(airPump, OUTPUT);
@@ -177,7 +183,7 @@ void setup() {
   digitalWrite(heatingCoil, LOW); // SSR set to low until needed.
   digitalWrite(airPump, HIGH);  // For some reason relay module has NO closed when low. So set to HIGH at setup. LOW to activate.
   digitalWrite(waterPump, HIGH); // For some reason relay module has NO closed when low. So set to HIGH at setup. LOW to activate.
-  grabberServo.write(OPEN);
+  
 
 }
 
@@ -217,21 +223,21 @@ void loop() {
 void pivotServoCalibration() {
   //pivotServo rotation arm degree calibration
   while(true) {
+  delay(longWait);
   pivotServo.write(SOUTH);  // South grabber facing down
   Serial.println("We're pointing South.");
-  delay(1000);
+  delay(longWait);
   pivotServo.write(SEAST);  // SouthEast
   Serial.println("We're pointing SouthEast.");
-  delay(1000);
+  delay(longWait);
   pivotServo.write(EAST);  // East
   Serial.println("We're pointing East.");
-  delay(1000);
+  delay(longWait);
   pivotServo.write(NEAST);  // NorthEast
   Serial.println("We're pointing NorthEast.");
-  delay(1000);
+  delay(longWait);
   pivotServo.write(NORTH);  // North
   Serial.println("We're pointing North.");
-  delay(3000);
   }
 }
 
@@ -805,4 +811,3 @@ void loop() {
   delay(1000);
 }
 */
-
