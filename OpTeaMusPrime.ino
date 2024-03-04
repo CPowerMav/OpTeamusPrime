@@ -86,7 +86,7 @@ int calculateSteps(float distanceCm) {
 const byte pivotOffset = 0; // pivotServo gets out of alignment. Plus value is servo more towards wood plank (opposite for grabber angle)
 const byte NORTH = 8+pivotOffset; // For pivotServo pointing straight up
 const byte EAST  = 45+pivotOffset; // For pivotServo pointing to the right
-const byte SOUTH = 90+pivotOffset; // For pivotServo pointing straight down - This is the expected initial position and index pivot arm to be pointing down
+const byte SOUTH = 87+pivotOffset; // For pivotServo pointing straight down - This is the expected initial position and index pivot arm to be pointing down
 const byte SEAST = 65+pivotOffset; // For pivotServo down and right
 const byte NEAST = 23+pivotOffset; // For pivotServo up and right
 
@@ -192,32 +192,32 @@ void loop() {
  loadButton.update();  // First refresh of buttons states required here
    // Main loop calls functions declared below
     Serial.println("The main loop function is starting");
-  pivotServoCalibration();
+  //pivotServoCalibration();
   //debugStartup();
     Serial.println("The main loop debugStartup is finished, moving to startupInit");
     delay(generalDelay);
-  //startupInit();
+  startupInit();
     Serial.println("The main loop startupInit is finished, moving to loadGrabber");
     delay(generalDelay);
-  //loadGrabber();
+  loadGrabber();
     Serial.println("The main loop loadGrabber function is finished, moving to teaSelection");
     delay(generalDelay);
-  //teaSelection();
+  teaSelection();
     Serial.println("The main loop teaSelection function is finished, moving to progAdjust");
     delay(generalDelay);
-  //progAdjust();
+  progAdjust();
     Serial.println("The main loop progAdjust function is finished, moving to whereAmI");
     delay(generalDelay);
+  //selectCupSize();
   //whereAmI();
-    Serial.println("The main loop whereAmI function is finished, moving to the beginning of the loop.");
-    delay(generalDelay);
-// selectCupSize();
+  //Serial.println("The main loop whereAmI function is finished, moving to the beginning of the loop.");
+  //delay(generalDelay);
 // preFlight();
 // pumpColdWater();
 // heatWater();
 // pumpHotWater();
 // steepFunction();
-// shutDown();
+ shutDown();
 }
 
 void pivotServoCalibration() {
