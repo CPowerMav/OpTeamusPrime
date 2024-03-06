@@ -121,7 +121,7 @@ int currentRecipeIndex = 0;
 // Create instance for one full step encoder
 EncoderStepCounter encoder(ENCODER_PIN1, ENCODER_PIN2, HALF_STEP);
 
-byte cupSizeSelection = 0;  // Variable to store whcih size the user selects (0 is small, 1 is large)
+byte selectedCupSize = 0; // Variable to store whcih size the user selects (0 is small, 1 is large)
 
 
 
@@ -208,7 +208,7 @@ void loop() {
   progAdjust();
     Serial.println("The main loop progAdjust function is finished, moving to whereAmI");
     delay(generalDelay);
-  //selectCupSize();
+  selectCupSize();
   //whereAmI();
   //Serial.println("The main loop whereAmI function is finished, moving to the beginning of the loop.");
   //delay(generalDelay);
@@ -282,7 +282,7 @@ void debugStartup() {
     nextButton.update();
     if (nextButton.fell()) {
       // Next button pressed, exit the function
-      Serial.println("Next button pressed, exiting debutStartup function");
+      Serial.println("Next button pressed, exiting debugStartup function");
       delay(generalDelay);
       return;
     }
@@ -304,7 +304,7 @@ void startupInit() {
   lcd.clear();
   lcd.print("OpTeaMus Prime");
   lcd.setCursor(0, 1);
-  lcd.print("Getting ready..");
+  lcd.print("is getting ready");
   delay(generalDelay);
   int targetPosition = SOUTH;                     // Set the target position (degrees)
   rotateServoSlowly(pivotServo, targetPosition);  // Call the function to rotate the servo
@@ -414,7 +414,7 @@ void progAdjust() {
   Serial.println("progAdjust function is running");
   long adjustedTime = 0;  // Variable to store adjusted time delta
   lcd.clear();
-  lcd.print("Adj Steep Time");
+  lcd.print("Steep Time:");
   lcd.setCursor(0, 1);
   lcd.print("+0s");
   Serial.print("BeforeWhileStatement: ");
@@ -428,16 +428,16 @@ void progAdjust() {
     if (pos != 0) {
       if (pos > 0) {
         adjustedTime += steepTimeAdjustInterval;  // Clockwise rotation
-        Serial.print("ifPos>0: ");
+        Serial.print("Adding time. New value is: ");
         Serial.println(adjustedTime);
       } else {
         adjustedTime -= steepTimeAdjustInterval;  // Counter-clockwise rotation
-        Serial.print("elsePos<0: ");
+        Serial.print("Subtracting time. New value is: ");
         Serial.println(adjustedTime);
       }
       
       // Check if adjusted time falls below one minute
-      if (teaParams[currentRecipeIndex].time + adjustedTime < 60000) {
+      if (teaParams[currentRecipeIndex].time + adjustedTime < 0) {
         lcd.clear();
         lcd.print("Error");
         lcd.setCursor(0, 1);
@@ -452,7 +452,7 @@ void progAdjust() {
         delay(2000); // Delay for 2 seconds to display the resetting message
         
         lcd.clear();
-        lcd.print("Adj Steep Time");
+        lcd.print("Steep Time:");
         lcd.setCursor(0, 1);
         lcd.print("+0s");
         
@@ -463,16 +463,22 @@ void progAdjust() {
       Serial.print("InsideWhileStatement: ");
       Serial.println(adjustedTime);
       
-      // Display plus or minus and the total time dynamically on the second line
+      // Calculate adjusted steep time
+      finalSteepTime = teaParams[currentRecipeIndex].time + adjustedTime;
+
+      // Convert total steep time to minutes and seconds
+      int minutes = finalSteepTime / 60000;
+      int seconds = (finalSteepTime % 60000) / 1000;
+
+      // Display the adjusted steep time on the LCD
       lcd.setCursor(0, 1);
       lcd.print("                ");
       lcd.setCursor(0, 1);
-      lcd.print(adjustedTime >= 0 ? "+" : "-");
-      lcd.print(abs(adjustedTime) / 1000);
+      lcd.print("Total: ");
+      lcd.print(minutes);
+      lcd.print("m");
+      lcd.print(seconds);
       lcd.print("s");
-
-      // Calculate adjusted steep time
-      finalSteepTime = teaParams[currentRecipeIndex].time + adjustedTime;
     }
 
     // Exit the function if the nextButton is pressed
@@ -486,57 +492,43 @@ void progAdjust() {
   }
 }
 
-/*
+
 void selectCupSize() {
-  Serial.println("selectCupSize fucnction is running");
-  // Clear the LCD display
+  Serial.println("selectCupSize function is running");
   lcd.clear();
-
-  // Display the cup size selection prompt on the first row
   lcd.print("Select Cup Size");
-
-  // Display the current cup size on the second row
   lcd.setCursor(0, 1);
-  lcd.print("Small   Large");
+  lcd.print(">Small   Large");
 
-  // Rotary encoder variables
-  int encoderValue = 0;
-  int encoderLastValue = 0;
+  while (true) {
+    nextButton.update();
+    signed char pos = encoder.getPosition();
+   
+    if (pos != 0) {
+      // Toggle between small and large cup sizes
+      selectedCupSize = (selectedCupSize + 1) % 2;
 
-  // While the nextButton is not pressed, allow the user to scroll through cup size options
-  while (nextButtonDebouncer.read() == HIGH) {
-    // Read changes from the selectorKnob
-    int selectorKnobChange = selectorKnob.read();
-
-    // Update selectorKnobValue based on the change
-    int selectorKnobValue = selectorKnobChange;
-
-    // Ensure the selectorKnob value stays within valid bounds (0 for Small, 1 for Large)
-    selectorKnobValue = constrain(selectorKnobValue, 0, 1);
-
-    // If the selectorKnob value changes, update the LCD display
-    if (selectorKnobChange != 0) {
+      // Update the display with the selected cup size
       lcd.setCursor(0, 1);
-      lcd.print(selectorKnobValue == 0 ? ">Small   Large" : " Small   >Large");
-
-      // Update the last encoder value
-      encoderLastValue = encoderValue;
+      if (selectedCupSize == 0) {
+        lcd.print(">Small     Large");
+      } else {
+        lcd.print(" Small    >Large");
+      }
+     
+      encoder.reset();
     }
 
-    // Check and debounce nextButton
-    nextButtonDebouncer.update();
-
-    if (nextButtonDebouncer.fell()) {
-      // User made a selection, update the global variable
-      cupSizeSelection = selectorKnobValue;
-
-      // Exit the function
+    // Check if the nextButton is pressed to confirm the selection
+    if (nextButton.fell()) {
+      Serial.print("Selected cup size: ");
+      Serial.println(selectedCupSize == 0 ? "Small" : "Large");
+      delay(generalDelay);
       return;
     }
+    delay(generalDelay);
   }
 }
-
-*/
 
 /*
 
@@ -588,7 +580,7 @@ void pumpColdWater() {  // Function to pump water from the cold reservoir to the
   // Check which water fill probe to use based on cup size selection
   int waterFillProbe;
 
-  if (cupSizeSelection == 0) {
+  if (selectedCupSize == 0) {
     waterFillProbe = waterFill;
   } else {
     waterFillProbe = waterFillMax;
@@ -792,7 +784,9 @@ APPENDIX:
 
 
 
-/* Note for water sensor VD
+/* 
+// Test code for measuring water temp sensor
+// Note for water sensor voltage divider
 const int waterProbePin = A0;  // Analog input pin for water probe
 
 void setup() {
